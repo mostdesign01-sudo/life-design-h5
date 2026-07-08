@@ -813,6 +813,38 @@
       margin: 14px 0;
     }
 
+    .privacy-line {
+      display: block;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .support-card {
+      margin-top: 26px;
+      padding: 16px;
+      border: 1px solid #d8e7e2;
+      border-radius: var(--radius);
+      background: #f4faf7;
+    }
+
+    .support-card h2 {
+      margin-top: 0;
+    }
+
+    .support-link {
+      color: var(--teal-dark);
+      font-weight: 760;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(20, 135, 126, 0.35);
+    }
+
+    .support-link:hover {
+      color: var(--teal);
+      border-bottom-color: var(--teal);
+    }
+
     .empty-state {
       color: var(--muted);
       font-size: 12px;
@@ -1352,7 +1384,7 @@
 
       if (step.id === "dashboard") {
         els.openingNote.style.display = "block";
-        els.openingNote.innerHTML = "这套方法来自斯坦福 d.school 很受欢迎的人生设计课。它的前提很朴素：人生更像一件可以反复设计、低成本试错的作品，不是一道必须算出标准答案的工程题。接下来大概需要 25 到 40 分钟，我们会先看清你现在真实所在的位置，再分清重力问题和可设计的问题，最后生成三个五年版本和本周就能开始的原型行动。你不需要先想清楚自己热爱什么，我们会一边走一边把线索找出来。";
+        els.openingNote.innerHTML = "这套方法来自斯坦福 d.school 很受欢迎的人生设计课。它的前提很朴素：人生更像一件可以反复设计、低成本试错的作品，不是一道必须算出标准答案的工程题。接下来大概需要 25 到 40 分钟，我们会先看清你现在真实所在的位置，再分清重力问题和可设计的问题，最后生成三个五年版本和本周就能开始的原型行动。你不需要先想清楚自己热爱什么，我们会一边走一边把线索找出来。<span class=\"privacy-line\">记录说明：你的回答会自动保存在当前浏览器本机，用来刷新后继续填写；不会上传到服务器或 GitHub。点击右上角重新开始按钮即可清空本机记录。</span>";
       } else {
         els.openingNote.style.display = "none";
         els.openingNote.textContent = "";
@@ -1910,6 +1942,13 @@
 
         <h2>失败免疫</h2>
         <p>人生是一场无限游戏，不是一次性押中的考试。三个版本都可以先试再调，谁都不是一锤定音的赌注。原型即使失败，也会留下信息：你会更清楚自己不想要什么、什么约束是真的、什么恐惧只是旧经验的回声。你不需要等到完全确信才开始。你只需要选一个小得足够开始、真得足够有信息量的动作，先让现实回答你。</p>
+
+        <div class="support-card">
+          <h2>支持作者</h2>
+          <p>如果这个小工具陪你看清了一点方向，欢迎去 GitHub 给项目点一个 Star。它不会改变你的人生，但会给作者一点继续把它打磨下去的确定感。</p>
+          <p>项目地址：<a class="support-link" href="https://github.com/mostdesign01-sudo/life-design-h5" target="_blank" rel="noopener">https://github.com/mostdesign01-sudo/life-design-h5</a></p>
+          <p class="tiny">隐私提醒：这份 H5 只把填写记录保存在当前浏览器本机，不会把你的回答上传到远端。</p>
+        </div>
       `;
     }
 
