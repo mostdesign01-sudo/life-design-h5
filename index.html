@@ -1720,6 +1720,187 @@
         border-radius: 22px;
       }
     }
+
+    @media (max-width: 940px) {
+      .layout {
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+
+      .stage {
+        order: 1;
+        min-height: 0;
+      }
+
+      .rail {
+        position: static;
+        order: 2;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        transform: none;
+      }
+
+      .rail .panel {
+        border-bottom: 1px solid var(--line);
+        min-width: 0;
+      }
+
+      .rail .panel:nth-child(odd) {
+        border-right: 1px solid var(--line);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        width: 100%;
+        padding: calc(14px + var(--safe-top)) 10px calc(22px + var(--safe-bottom));
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+        gap: 14px;
+        margin: 0 0 14px;
+        padding: 16px;
+      }
+
+      .brand {
+        align-items: flex-start;
+      }
+
+      .subtitle {
+        max-width: 100%;
+        font-size: 13px;
+      }
+
+      .top-actions {
+        display: grid;
+        grid-template-columns: 44px 44px minmax(0, 1fr);
+        width: 100%;
+      }
+
+      .top-actions .text-button {
+        width: 100%;
+      }
+
+      .layout {
+        gap: 14px;
+      }
+
+      .stage-head {
+        padding: 30px 18px 26px;
+      }
+
+      .question-title {
+        font-size: 30px;
+        line-height: 1.1;
+      }
+
+      .stage-body,
+      .stage-foot,
+      .report-toolbar,
+      .ai-report,
+      .report-content {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .intro-lead {
+        font-size: 14px;
+        line-height: 1.78;
+      }
+
+      .method-pill-row span {
+        min-height: 28px;
+        font-size: 11px;
+      }
+
+      .slider-grid,
+      .choice-list,
+      .two-columns,
+      .pick-row,
+      .odyssey-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stage-foot,
+      .report-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .left-actions,
+      .right-actions {
+        width: 100%;
+      }
+
+      .stage-foot .left-actions,
+      .stage-foot .right-actions,
+      .report-toolbar .right-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .report-toolbar .right-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .report-toolbar .right-actions #returnButton,
+      .report-toolbar .right-actions #aiButton,
+      .report-toolbar .right-actions #downloadButton {
+        grid-column: 1 / -1;
+      }
+
+      .primary-button,
+      .secondary-button,
+      .text-button {
+        width: 100%;
+        min-width: 0;
+        min-height: 44px;
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .rail {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .rail .panel:nth-child(odd) {
+        border-right: 0;
+      }
+
+      .phase-list {
+        display: flex;
+        gap: 8px;
+        max-width: 100%;
+        min-width: 0;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+      }
+
+      .phase-list::-webkit-scrollbar {
+        display: none;
+      }
+
+      .phase-item {
+        min-width: 118px;
+        grid-template-columns: 26px minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 360px) {
+      h1 {
+        font-size: 20px;
+      }
+
+      .question-title {
+        font-size: 28px;
+      }
+
+      .top-actions {
+        grid-template-columns: 42px 42px minmax(0, 1fr);
+      }
+    }
   </style>
 </head>
 <body>
