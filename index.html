@@ -1191,6 +1191,9 @@
                 <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7a3.5 3.5 0 0 0 0 7Z"></path><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 1 1-2.98 2.98l-.04-.04a1.8 1.8 0 0 0-1.98-.36a1.8 1.8 0 0 0-1.1 1.66V21.4a2.1 2.1 0 1 1-4.2 0v-.06A1.8 1.8 0 0 0 8.4 19.7a1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 1 1-2.98-2.98l.04-.04A1.8 1.8 0 0 0 3.8 15.1a1.8 1.8 0 0 0-1.66-1.1H2.1a2.1 2.1 0 1 1 0-4.2h.06A1.8 1.8 0 0 0 3.8 8.7a1.8 1.8 0 0 0-.36-1.98l-.04-.04a2.1 2.1 0 1 1 2.98-2.98l.04.04A1.8 1.8 0 0 0 8.4 4.1a1.8 1.8 0 0 0 1.1-1.66V2.4a2.1 2.1 0 1 1 4.2 0v.06a1.8 1.8 0 0 0 1.1 1.66a1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 1 1 2.98 2.98l-.04.04a1.8 1.8 0 0 0-.36 1.98a1.8 1.8 0 0 0 1.66 1.1h.06a2.1 2.1 0 1 1 0 4.2h-.06A1.8 1.8 0 0 0 19.4 15Z"></path></svg>
                 AI 接口
               </button>
+              <button class="secondary-button" id="redeemButton" type="button">
+                激活码
+              </button>
               <button class="primary-button" id="aiButton" type="button">
                 AI 深度蓝图
                 <svg viewBox="0 0 24 24"><path d="M12 3l1.7 5.2L19 10l-5.3 1.8L12 17l-1.7-5.2L5 10l5.3-1.8L12 3Z"></path><path d="M19 15l.9 2.6L22.5 18l-2.6.9L19 21.5l-.9-2.6l-2.6-.9l2.6-.9L19 15Z"></path></svg>
@@ -1206,6 +1209,7 @@
               <div>
                 <p class="ai-report-title">AI 深度蓝图</p>
                 <div class="ai-status" id="aiStatus">把结构化回答交给后端 AI，生成更细的重定义、矛盾洞察和 90 天原型。</div>
+                <div class="ai-status" id="quotaStatus">默认每个浏览器每天免费 1 次 AI；超出后可用激活码增加次数。</div>
               </div>
             </div>
             <div class="ai-report-body" id="aiReportContent"></div>
@@ -1222,6 +1226,7 @@
     const STORAGE_KEY = "lifeDesignH5StateV1";
     const AI_ENDPOINT_STORAGE_KEY = "lifeDesignAiEndpointV1";
     const AI_REPORT_STORAGE_KEY = "lifeDesignAiReportV1";
+    const AI_USER_STORAGE_KEY = "lifeDesignAnonymousUserV1";
 
     const phases = [
       { key: "here", label: "你在这里" },
@@ -1397,10 +1402,12 @@
       returnButton: document.getElementById("returnButton"),
       copyButton: document.getElementById("copyButton"),
       aiConfigButton: document.getElementById("aiConfigButton"),
+      redeemButton: document.getElementById("redeemButton"),
       aiButton: document.getElementById("aiButton"),
       downloadButton: document.getElementById("downloadButton"),
       aiReportBox: document.getElementById("aiReportBox"),
       aiStatus: document.getElementById("aiStatus"),
+      quotaStatus: document.getElementById("quotaStatus"),
       aiReportContent: document.getElementById("aiReportContent"),
       toast: document.getElementById("toast")
     };
@@ -1947,6 +1954,7 @@
       const html = generateReport();
       els.reportContent.innerHTML = html;
       restoreAiReport();
+      refreshQuotaStatus();
       els.reportMeta.textContent = `生成时间：${formatDateTime(state.reportGeneratedAt)}。这是一版可修改的蓝图，不是终身判决。`;
       els.questionView.style.display = "none";
       els.reportView.classList.add("is-visible");
@@ -2168,6 +2176,16 @@
       return localStorage.getItem(AI_ENDPOINT_STORAGE_KEY) || "";
     }
 
+    function getAiUserId() {
+      let id = localStorage.getItem(AI_USER_STORAGE_KEY);
+      if (id) return id;
+      const random = new Uint8Array(16);
+      crypto.getRandomValues(random);
+      id = `anon_${Array.from(random).map(value => value.toString(16).padStart(2, "0")).join("")}`;
+      localStorage.setItem(AI_USER_STORAGE_KEY, id);
+      return id;
+    }
+
     function configureAiEndpoint() {
       const current = getAiEndpoint();
       const next = prompt("请输入 AI 后端接口地址，例如：https://你的域名/api/analyze-life-design。留空会清除当前配置。", current);
@@ -2181,6 +2199,69 @@
       localStorage.setItem(AI_ENDPOINT_STORAGE_KEY, value);
       showToast("AI 接口地址已保存");
       return value;
+    }
+
+    function endpointUrl(path) {
+      const endpoint = getAiEndpoint();
+      if (!endpoint) return "";
+      try {
+        const url = new URL(endpoint);
+        if (path === "/api/analyze-life-design") return url.toString();
+        url.pathname = path;
+        url.search = "";
+        url.hash = "";
+        return url.toString();
+      } catch (error) {
+        return "";
+      }
+    }
+
+    async function refreshQuotaStatus() {
+      const url = endpointUrl("/api/quota");
+      if (!url || !els.quotaStatus) {
+        if (els.quotaStatus) els.quotaStatus.textContent = "默认每个浏览器每天免费 1 次 AI；配置后端接口后可查询剩余次数。";
+        return;
+      }
+      try {
+        const response = await fetch(url, {
+          headers: { "X-Life-Design-User": getAiUserId() }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "额度查询失败");
+        updateQuotaStatus(data.quota);
+      } catch (error) {
+        els.quotaStatus.textContent = "额度暂时无法查询，请检查 AI 接口配置。";
+      }
+    }
+
+    function updateQuotaStatus(quota) {
+      if (!quota || !els.quotaStatus) return;
+      els.quotaStatus.textContent = `今日免费 ${quota.usedToday}/${quota.dailyFreeLimit}，激活码余量 ${quota.credits} 次，当前可用 ${quota.totalRemaining} 次。`;
+    }
+
+    async function redeemActivationCode() {
+      let endpoint = getAiEndpoint();
+      if (!endpoint) endpoint = configureAiEndpoint();
+      if (!endpoint) return;
+      const code = prompt("请输入激活码。激活码会给当前浏览器增加 AI 使用次数。");
+      if (!code) return;
+      const url = endpointUrl("/api/redeem-code");
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Life-Design-User": getAiUserId()
+          },
+          body: JSON.stringify({ code: code.trim() })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "激活失败");
+        updateQuotaStatus(data.quota);
+        showToast("激活码已兑换");
+      } catch (error) {
+        showToast(error.message || "激活失败");
+      }
     }
 
     function buildAiPayload() {
@@ -2213,7 +2294,10 @@
       try {
         const response = await fetch(endpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Life-Design-User": getAiUserId()
+          },
           body: JSON.stringify(buildAiPayload())
         });
         const data = await response.json().catch(() => ({}));
@@ -2223,6 +2307,7 @@
         const markdown = data.analysisMarkdown || data.reportMarkdown || data.analysis || data.report || "";
         if (!markdown.trim()) throw new Error("接口没有返回可展示的分析内容");
         renderAiReport(markdown, data.model);
+        updateQuotaStatus(data.quota);
         localStorage.setItem(AI_REPORT_STORAGE_KEY, JSON.stringify({
           markdown,
           model: data.model || "",
@@ -2365,6 +2450,7 @@
     els.returnButton.addEventListener("click", returnToQuestions);
     els.copyButton.addEventListener("click", copyReport);
     els.aiConfigButton.addEventListener("click", configureAiEndpoint);
+    els.redeemButton.addEventListener("click", redeemActivationCode);
     els.aiButton.addEventListener("click", generateAiReportFromApi);
     els.downloadButton.addEventListener("click", downloadReport);
 

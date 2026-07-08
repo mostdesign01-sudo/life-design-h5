@@ -1,6 +1,7 @@
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -14,10 +15,178 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://mostdesign01-su
 const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 220000);
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 60 * 60 * 1000);
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 20);
+const DAILY_FREE_AI_CALLS = Number(process.env.DAILY_FREE_AI_CALLS || 1);
+const ACTIVATION_CODES = (process.env.ACTIVATION_CODES || "")
+  .split(",")
+  .map(item => item.trim())
+  .filter(Boolean);
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "usage-db.json");
+const IP_HASH_SECRET = process.env.IP_HASH_SECRET || "replace-this-secret-on-server";
 
 const rateLimitBuckets = new Map();
 const promptPath = path.join(__dirname, "..", "prompts", "life-design-system-prompt.md");
 const SYSTEM_PROMPT = fs.readFileSync(promptPath, "utf8");
+const db = loadDb();
+
+function loadDb() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!fs.existsSync(DB_PATH)) {
+    return { users: {}, activationCodes: {}, usageLogs: [] };
+  }
+  try {
+    return JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+  } catch (error) {
+    return { users: {}, activationCodes: {}, usageLogs: [] };
+  }
+}
+
+function saveDb() {
+  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function sanitizeUserId(value) {
+  const text = String(value || "");
+  return /^[a-zA-Z0-9_-]{12,80}$/.test(text) ? text : "";
+}
+
+function ensureUser(userId) {
+  if (!db.users[userId]) {
+    db.users[userId] = {
+      createdAt: new Date().toISOString(),
+      credits: 0,
+      dailyUsage: {}
+    };
+    saveDb();
+  }
+  return db.users[userId];
+}
+
+function ipHash(ip) {
+  return crypto.createHmac("sha256", IP_HASH_SECRET).update(ip).digest("hex").slice(0, 16);
+}
+
+function estimateCostUsd(usage) {
+  if (!usage) return null;
+  const inputTokens = Number(usage.prompt_tokens || 0);
+  const outputTokens = Number(usage.completion_tokens || 0);
+  const model = String(AI_MODEL).toLowerCase();
+  const isPro = model.includes("pro") || model.includes("reasoner");
+  const inputPerMillion = isPro ? 0.435 : 0.14;
+  const outputPerMillion = isPro ? 0.87 : 0.28;
+  return Number(((inputTokens / 1000000) * inputPerMillion + (outputTokens / 1000000) * outputPerMillion).toFixed(6));
+}
+
+function quotaFor(userId) {
+  const user = ensureUser(userId);
+  const day = todayKey();
+  const usedToday = Number(user.dailyUsage[day] || 0);
+  return {
+    date: day,
+    dailyFreeLimit: DAILY_FREE_AI_CALLS,
+    usedToday,
+    freeRemaining: Math.max(DAILY_FREE_AI_CALLS - usedToday, 0),
+    credits: Number(user.credits || 0),
+    totalRemaining: Math.max(DAILY_FREE_AI_CALLS - usedToday, 0) + Number(user.credits || 0)
+  };
+}
+
+function consumeQuota(userId) {
+  const user = ensureUser(userId);
+  const quota = quotaFor(userId);
+  if (quota.freeRemaining > 0) {
+    user.dailyUsage[quota.date] = quota.usedToday + 1;
+    saveDb();
+    return { source: "daily_free", quota: quotaFor(userId) };
+  }
+  if (quota.credits > 0) {
+    user.credits -= 1;
+    saveDb();
+    return { source: "activation_credit", quota: quotaFor(userId) };
+  }
+  const error = new Error("今日免费 AI 次数已用完，请输入激活码获取更多次数");
+  error.status = 402;
+  error.quota = quota;
+  throw error;
+}
+
+function refundQuota(userId, source) {
+  const user = ensureUser(userId);
+  const day = todayKey();
+  if (source === "daily_free" && user.dailyUsage[day] > 0) {
+    user.dailyUsage[day] -= 1;
+  }
+  if (source === "activation_credit") {
+    user.credits = Number(user.credits || 0) + 1;
+  }
+  saveDb();
+}
+
+function normalizeActivationCodes() {
+  ACTIVATION_CODES.forEach(raw => {
+    const [code, countText] = raw.split(":");
+    const cleanCode = String(code || "").trim();
+    if (!cleanCode || db.activationCodes[cleanCode]) return;
+    db.activationCodes[cleanCode] = {
+      credits: Math.max(Number(countText || 5), 1),
+      usedBy: null,
+      usedAt: null
+    };
+  });
+  saveDb();
+}
+
+function redeemActivationCode(userId, code) {
+  normalizeActivationCodes();
+  const cleanCode = String(code || "").trim();
+  const record = db.activationCodes[cleanCode];
+  if (!record) {
+    throw Object.assign(new Error("激活码无效"), { status: 400 });
+  }
+  if (record.usedBy && record.usedBy !== userId) {
+    throw Object.assign(new Error("激活码已被使用"), { status: 409 });
+  }
+  const user = ensureUser(userId);
+  if (!record.usedBy) {
+    record.usedBy = userId;
+    record.usedAt = new Date().toISOString();
+    user.credits = Number(user.credits || 0) + Number(record.credits || 0);
+    saveDb();
+  }
+  return quotaFor(userId);
+}
+
+function logUsage(entry) {
+  db.usageLogs.push({
+    createdAt: new Date().toISOString(),
+    ...entry
+  });
+  if (db.usageLogs.length > 5000) {
+    db.usageLogs.splice(0, db.usageLogs.length - 5000);
+  }
+  saveDb();
+}
+
+function statsSummary() {
+  const today = todayKey();
+  const todayLogs = db.usageLogs.filter(log => String(log.createdAt || "").startsWith(today));
+  const successLogs = db.usageLogs.filter(log => log.status === "success");
+  const totalCostUsd = successLogs.reduce((sum, log) => sum + Number(log.estimatedCostUsd || 0), 0);
+  return {
+    users: Object.keys(db.users).length,
+    totalCalls: db.usageLogs.length,
+    todayCalls: todayLogs.length,
+    successCalls: successLogs.length,
+    estimatedCostUsd: Number(totalCostUsd.toFixed(6)),
+    latest: db.usageLogs.slice(-20).reverse()
+  };
+}
+
+normalizeActivationCodes();
 
 function corsHeaders(origin) {
   const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || "*";
@@ -35,6 +204,12 @@ function sendJson(res, status, payload, origin) {
     ...corsHeaders(origin)
   });
   res.end(JSON.stringify(payload));
+}
+
+function requestUserId(req) {
+  const headerId = sanitizeUserId(req.headers["x-life-design-user"]);
+  if (headerId) return headerId;
+  return "";
 }
 
 function clientIp(req) {
@@ -144,12 +319,57 @@ async function callModel(payload) {
 }
 
 async function handleAnalyze(req, res, origin) {
-  assertRateLimit(clientIp(req));
+  const ip = clientIp(req);
+  const userId = requestUserId(req);
+  if (!userId) {
+    sendJson(res, 400, { error: "缺少匿名用户 ID" }, origin);
+    return;
+  }
+  assertRateLimit(ip);
   const body = await readRequestBody(req);
   const payload = JSON.parse(body || "{}");
   validatePayload(payload);
-  const result = await callModel(payload);
-  sendJson(res, 200, result, origin);
+  const startedAt = Date.now();
+  const consumed = consumeQuota(userId);
+  try {
+    const result = await callModel(payload);
+    const estimatedCostUsd = estimateCostUsd(result.usage);
+    logUsage({
+      userId,
+      ipHash: ipHash(ip),
+      model: result.model,
+      quotaSource: consumed.source,
+      status: "success",
+      usage: result.usage,
+      estimatedCostUsd,
+      latencyMs: Date.now() - startedAt
+    });
+    sendJson(res, 200, { ...result, quota: consumed.quota, estimatedCostUsd }, origin);
+  } catch (error) {
+    refundQuota(userId, consumed.source);
+    logUsage({
+      userId,
+      ipHash: ipHash(ip),
+      model: AI_MODEL,
+      quotaSource: consumed.source,
+      status: "failed",
+      error: error.message || "模型调用失败",
+      latencyMs: Date.now() - startedAt
+    });
+    throw error;
+  }
+}
+
+async function handleRedeem(req, res, origin) {
+  const userId = requestUserId(req);
+  if (!userId) {
+    sendJson(res, 400, { error: "缺少匿名用户 ID" }, origin);
+    return;
+  }
+  const body = await readRequestBody(req);
+  const payload = JSON.parse(body || "{}");
+  const quota = redeemActivationCode(userId, payload.code);
+  sendJson(res, 200, { ok: true, quota }, origin);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -163,6 +383,30 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && req.url === "/health") {
     sendJson(res, 200, { ok: true, model: AI_MODEL }, origin);
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/api/quota") {
+    const userId = requestUserId(req);
+    if (!userId) {
+      sendJson(res, 400, { error: "缺少匿名用户 ID" }, origin);
+      return;
+    }
+    sendJson(res, 200, { ok: true, quota: quotaFor(userId) }, origin);
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/redeem-code") {
+    try {
+      await handleRedeem(req, res, origin);
+    } catch (error) {
+      sendJson(res, error.status || 500, { error: error.message || "服务器错误" }, origin);
+    }
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/api/stats") {
+    sendJson(res, 200, { ok: true, stats: statsSummary() }, origin);
     return;
   }
 
