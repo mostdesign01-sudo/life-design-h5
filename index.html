@@ -821,6 +821,16 @@
       line-height: 1.55;
     }
 
+    .method-background {
+      display: block;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(216, 228, 223, 0.9);
+      color: #35514d;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
     .support-card {
       margin-top: 26px;
       padding: 16px;
@@ -1384,7 +1394,7 @@
 
       if (step.id === "dashboard") {
         els.openingNote.style.display = "block";
-        els.openingNote.innerHTML = "这套方法来自斯坦福 d.school 很受欢迎的人生设计课。它的前提很朴素：人生更像一件可以反复设计、低成本试错的作品，不是一道必须算出标准答案的工程题。接下来大概需要 25 到 40 分钟，我们会先看清你现在真实所在的位置，再分清重力问题和可设计的问题，最后生成三个五年版本和本周就能开始的原型行动。你不需要先想清楚自己热爱什么，我们会一边走一边把线索找出来。<span class=\"privacy-line\">记录说明：你的回答会自动保存在当前浏览器本机，用来刷新后继续填写；不会上传到服务器或 GitHub。点击右上角重新开始按钮即可清空本机记录。</span>";
+        els.openingNote.innerHTML = "这套方法来自斯坦福 d.school 很受欢迎的人生设计课。它的前提很朴素：人生更像一件可以反复设计、低成本试错的作品，不是一道必须算出标准答案的工程题。接下来大概需要 25 到 40 分钟，我们会先看清你现在真实所在的位置，再分清重力问题和可设计的问题，最后生成三个五年版本和本周就能开始的原型行动。你不需要先想清楚自己热爱什么，我们会一边走一边把线索找出来。<span class=\"method-background\"><strong>方法背景：</strong>本工具受到 Bill Burnett 和 Dave Evans 合著的 <em>Designing Your Life: How to Build a Well-Lived, Joyful Life</em> 启发。两位作者把设计思维带入人生选择，强调重构问题、识别重力问题、记录能量、设计多个奥德赛计划，并用低成本原型去验证真实生活。本页面是个人学习与实践项目，不代表作者、出版社或 Stanford d.school 官方出品。</span><span class=\"privacy-line\">记录说明：你的回答会自动保存在当前浏览器本机，用来刷新后继续填写；不会上传到服务器或 GitHub。点击右上角重新开始按钮即可清空本机记录。</span>";
       } else {
         els.openingNote.style.display = "none";
         els.openingNote.textContent = "";
