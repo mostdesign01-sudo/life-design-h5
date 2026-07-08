@@ -16,6 +16,8 @@ const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 220000);
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 60 * 60 * 1000);
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 20);
 const DAILY_FREE_AI_CALLS = Number(process.env.DAILY_FREE_AI_CALLS || 1);
+const DAILY_FREE_COACH_CALLS = Number(process.env.DAILY_FREE_COACH_CALLS || 4);
+const QUOTA_TIMEZONE_OFFSET_MINUTES = Number(process.env.QUOTA_TIMEZONE_OFFSET_MINUTES || 480);
 const ACTIVATION_CODES = (process.env.ACTIVATION_CODES || "")
   .split(",")
   .map(item => item.trim())
@@ -46,7 +48,7 @@ function saveDb() {
 }
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return new Date(Date.now() + QUOTA_TIMEZONE_OFFSET_MINUTES * 60 * 1000).toISOString().slice(0, 10);
 }
 
 function sanitizeUserId(value) {
@@ -59,10 +61,14 @@ function ensureUser(userId) {
     db.users[userId] = {
       createdAt: new Date().toISOString(),
       credits: 0,
-      dailyUsage: {}
+      dailyUsage: {},
+      dailyCoachUsage: {}
     };
     saveDb();
   }
+  if (!db.users[userId].dailyUsage) db.users[userId].dailyUsage = {};
+  if (!db.users[userId].dailyCoachUsage) db.users[userId].dailyCoachUsage = {};
+  if (typeof db.users[userId].credits !== "number") db.users[userId].credits = Number(db.users[userId].credits || 0);
   return db.users[userId];
 }
 
@@ -91,8 +97,25 @@ function quotaFor(userId) {
     usedToday,
     freeRemaining: Math.max(DAILY_FREE_AI_CALLS - usedToday, 0),
     credits: Number(user.credits || 0),
-    totalRemaining: Math.max(DAILY_FREE_AI_CALLS - usedToday, 0) + Number(user.credits || 0)
+    totalRemaining: Math.max(DAILY_FREE_AI_CALLS - usedToday, 0) + Number(user.credits || 0),
+    coachDailyLimit: DAILY_FREE_COACH_CALLS,
+    coachUsedToday: Number(user.dailyCoachUsage[day] || 0),
+    coachRemaining: Math.max(DAILY_FREE_COACH_CALLS - Number(user.dailyCoachUsage[day] || 0), 0)
   };
+}
+
+function consumeCoachQuota(userId) {
+  const user = ensureUser(userId);
+  const quota = quotaFor(userId);
+  if (quota.coachRemaining <= 0) {
+    const error = new Error("今日 AI 关键追问次数已用完，仍可继续完成固定问答和最终蓝图");
+    error.status = 402;
+    error.quota = quota;
+    throw error;
+  }
+  user.dailyCoachUsage[quota.date] = quota.coachUsedToday + 1;
+  saveDb();
+  return { source: "daily_coach", quota: quotaFor(userId) };
 }
 
 function consumeQuota(userId) {
@@ -122,6 +145,9 @@ function refundQuota(userId, source) {
   }
   if (source === "activation_credit") {
     user.credits = Number(user.credits || 0) + 1;
+  }
+  if (source === "daily_coach" && user.dailyCoachUsage[day] > 0) {
+    user.dailyCoachUsage[day] -= 1;
   }
   saveDb();
 }
@@ -261,6 +287,20 @@ function validatePayload(payload) {
   }
 }
 
+const COACH_STEP_FOCUS = {
+  coreProblem: "判断这个困扰里的重力问题、可设计问题，以及用户可能正在守住的安全策略。",
+  lifeview: "对照工作观和人生观，指出一致线索或张力，不讨论具体职位。",
+  energy: "拆开擅长、心流、回血和抽干，提醒一个可能的能量误判。",
+  odyssey: "对三个五年版本做一次路线级追问，帮助用户选一个低成本原型。"
+};
+
+function validateCoachPayload(payload) {
+  validatePayload(payload);
+  if (!COACH_STEP_FOCUS[payload.stepId]) {
+    throw Object.assign(new Error("这个步骤暂不支持 AI 关键追问"), { status: 400 });
+  }
+}
+
 function buildUserPrompt(payload) {
   return [
     "以下是用户通过人生设计 H5 填写的结构化回答，以及当前固定模板生成的初版报告。",
@@ -279,10 +319,36 @@ function buildUserPrompt(payload) {
   ].join("\n");
 }
 
-async function callModel(payload) {
+function buildCoachPrompt(payload) {
+  return [
+    "你正在一个中文 H5 里扮演斯坦福人生设计师。现在只做一次关键节点追问，不要写完整报告。",
+    "你的任务：温暖但犀利地指出一个关键观察，再给一个追问和一个低成本原型动作。",
+    "必须输出严格 JSON，不要 Markdown，不要代码块。",
+    "JSON 字段固定为：headline, reflection, question, prototype, watchout。",
+    "长度限制：headline 不超过 18 个汉字；reflection 不超过 90 个汉字；question 不超过 70 个汉字；prototype 不超过 70 个汉字；watchout 不超过 60 个汉字。",
+    "",
+    `【当前步骤】${payload.stepId}`,
+    `【本步关注】${COACH_STEP_FOCUS[payload.stepId]}`,
+    "",
+    "【用户回答 JSON】",
+    JSON.stringify(payload.answers || {}, null, 2),
+    "",
+    "【问题雷达】",
+    JSON.stringify(payload.problemRadar || {}, null, 2)
+  ].join("\n");
+}
+
+async function requestChatCompletion({ messages, temperature = 0.72, maxTokens }) {
   if (!AI_API_KEY) {
     throw Object.assign(new Error("服务器未配置 AI_API_KEY"), { status: 500 });
   }
+
+  const body = {
+    model: AI_MODEL,
+    temperature,
+    messages
+  };
+  if (maxTokens) body.max_tokens = maxTokens;
 
   const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -290,14 +356,7 @@ async function callModel(payload) {
       "Authorization": `Bearer ${AI_API_KEY}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      temperature: 0.72,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildUserPrompt(payload) }
-      ]
-    })
+    body: JSON.stringify(body)
   });
 
   const data = await response.json().catch(() => ({}));
@@ -305,6 +364,17 @@ async function callModel(payload) {
     const message = data.error?.message || data.message || `模型接口返回 ${response.status}`;
     throw Object.assign(new Error(message), { status: response.status });
   }
+  return data;
+}
+
+async function callModel(payload) {
+  const data = await requestChatCompletion({
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: buildUserPrompt(payload) }
+    ],
+    temperature: 0.72
+  });
 
   const analysisMarkdown = data.choices?.[0]?.message?.content || "";
   if (!analysisMarkdown.trim()) {
@@ -313,6 +383,60 @@ async function callModel(payload) {
 
   return {
     analysisMarkdown,
+    model: data.model || AI_MODEL,
+    usage: data.usage || null
+  };
+}
+
+function parseJsonObject(text) {
+  const raw = String(text || "").trim();
+  const unfenced = raw.replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
+  const start = unfenced.indexOf("{");
+  const end = unfenced.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return null;
+  try {
+    return JSON.parse(unfenced.slice(start, end + 1));
+  } catch (error) {
+    return null;
+  }
+}
+
+function limitText(value, maxLength) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function normalizeCoach(raw, fallbackText) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  return {
+    headline: limitText(source.headline || "关键追问", 18),
+    reflection: limitText(source.reflection || fallbackText || "这里值得再停一下：真正的问题可能不在表层选项，而在你一直试图保护的东西。", 120),
+    question: limitText(source.question || "如果只允许你改变一个最小动作，你会先动哪一块？", 90),
+    prototype: limitText(source.prototype || "找一位相关经历的人聊 20 分钟，只问真实一天、代价和转折点。", 90),
+    watchout: limitText(source.watchout || "不要把一次原型误读成终身决定。", 70)
+  };
+}
+
+async function callCoachModel(payload) {
+  const data = await requestChatCompletion({
+    messages: [
+      {
+        role: "system",
+        content: "你是人生设计 H5 的关键节点教练。只输出可解析 JSON，不输出 Markdown。"
+      },
+      { role: "user", content: buildCoachPrompt(payload) }
+    ],
+    temperature: 0.55,
+    maxTokens: 520
+  });
+  const content = data.choices?.[0]?.message?.content || "";
+  if (!content.trim()) {
+    throw Object.assign(new Error("模型没有返回关键追问内容"), { status: 502 });
+  }
+  return {
+    coach: normalizeCoach(parseJsonObject(content), content),
     model: data.model || AI_MODEL,
     usage: data.usage || null
   };
@@ -335,6 +459,7 @@ async function handleAnalyze(req, res, origin) {
     const result = await callModel(payload);
     const estimatedCostUsd = estimateCostUsd(result.usage);
     logUsage({
+      feature: "deep_report",
       userId,
       ipHash: ipHash(ip),
       model: result.model,
@@ -348,6 +473,53 @@ async function handleAnalyze(req, res, origin) {
   } catch (error) {
     refundQuota(userId, consumed.source);
     logUsage({
+      feature: "deep_report",
+      userId,
+      ipHash: ipHash(ip),
+      model: AI_MODEL,
+      quotaSource: consumed.source,
+      status: "failed",
+      error: error.message || "模型调用失败",
+      latencyMs: Date.now() - startedAt
+    });
+    throw error;
+  }
+}
+
+async function handleCoach(req, res, origin) {
+  const ip = clientIp(req);
+  const userId = requestUserId(req);
+  if (!userId) {
+    sendJson(res, 400, { error: "缺少匿名用户 ID" }, origin);
+    return;
+  }
+  assertRateLimit(ip);
+  const body = await readRequestBody(req);
+  const payload = JSON.parse(body || "{}");
+  validateCoachPayload(payload);
+  const startedAt = Date.now();
+  const consumed = consumeCoachQuota(userId);
+  try {
+    const result = await callCoachModel(payload);
+    const estimatedCostUsd = estimateCostUsd(result.usage);
+    logUsage({
+      feature: "coach_step",
+      stepId: payload.stepId,
+      userId,
+      ipHash: ipHash(ip),
+      model: result.model,
+      quotaSource: consumed.source,
+      status: "success",
+      usage: result.usage,
+      estimatedCostUsd,
+      latencyMs: Date.now() - startedAt
+    });
+    sendJson(res, 200, { ...result, quota: quotaFor(userId), estimatedCostUsd }, origin);
+  } catch (error) {
+    refundQuota(userId, consumed.source);
+    logUsage({
+      feature: "coach_step",
+      stepId: payload.stepId,
       userId,
       ipHash: ipHash(ip),
       model: AI_MODEL,
@@ -415,6 +587,15 @@ const server = http.createServer(async (req, res) => {
       await handleAnalyze(req, res, origin);
     } catch (error) {
       sendJson(res, error.status || 500, { error: error.message || "服务器错误" }, origin);
+    }
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/coach-step") {
+    try {
+      await handleCoach(req, res, origin);
+    } catch (error) {
+      sendJson(res, error.status || 500, { error: error.message || "服务器错误", quota: error.quota || null }, origin);
     }
     return;
   }

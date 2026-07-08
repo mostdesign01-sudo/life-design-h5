@@ -827,6 +827,44 @@
       color: var(--teal-dark);
     }
 
+    .coach-card {
+      margin-top: 12px;
+      padding: 13px 14px;
+      border: 1px solid rgba(33, 33, 33, 0.12);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      color: rgba(33, 33, 33, 0.82);
+      line-height: 1.68;
+    }
+
+    .coach-label {
+      display: inline-flex;
+      width: fit-content;
+      margin-bottom: 8px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--ink);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .coach-title {
+      margin: 0 0 6px;
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .coach-card p {
+      margin: 6px 0 0;
+    }
+
+    .coach-card.is-loading,
+    .coach-card.is-muted {
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.52);
+    }
+
     .warning {
       display: none;
       border: 2px solid var(--sketch);
@@ -2069,6 +2107,7 @@
     const DEFAULT_AI_ENDPOINT = "https://api.mostdesign.cn/api/analyze-life-design";
     const AI_REPORT_STORAGE_KEY = "lifeDesignAiReportV1";
     const AI_USER_STORAGE_KEY = "lifeDesignAnonymousUserV1";
+    const AI_COACH_STEPS = new Set(["coreProblem", "lifeview", "energy", "odyssey"]);
 
     const phases = [
       { key: "here", label: "你在这里" },
@@ -2207,11 +2246,23 @@
       },
       completed: [],
       feedback: {},
+      aiCoach: {},
       problem: null,
       reportGeneratedAt: null
     };
 
     let state = loadState();
+    Object.keys(state.aiCoach || {}).forEach(stepId => {
+      if (state.aiCoach[stepId]?.status === "loading") {
+        state.aiCoach[stepId] = {
+          ...state.aiCoach[stepId],
+          status: "error",
+          error: "上一次 AI 关键追问被中断。你可以重新提交这一题再试。"
+        };
+      }
+      const step = steps.find(item => item.id === stepId);
+      if (step && state.feedback?.[stepId]) updateStepFeedback(step);
+    });
 
     const els = {
       stepCounter: document.getElementById("stepCounter"),
@@ -2267,7 +2318,8 @@
             ...(parsed.answers || {})
           },
           completed: Array.isArray(parsed.completed) ? parsed.completed : [],
-          feedback: parsed.feedback || {}
+          feedback: parsed.feedback || {},
+          aiCoach: parsed.aiCoach || {}
         };
       } catch (error) {
         return structuredClone(initialState);
@@ -2339,7 +2391,7 @@
             <span>低成本原型行动</span>
           </div>
           <span class="method-background"><strong>方法背景：</strong>这套工具受到 Bill Burnett 和 Dave Evans 合著的 <em>Designing Your Life: How to Build a Well-Lived, Joyful Life</em> 启发。两位作者把设计思维带入人生选择，强调人生不是一道需要算出唯一标准答案的工程题，而是一件可以反复试做、快速反馈、持续迭代的作品。接下来大概需要 25 到 40 分钟，我们会先看清你现在真实所在的位置，再分清重力问题和可设计的问题，最后生成三个五年版本和本周就能开始的原型行动。本页面是个人学习与实践项目，不代表作者、出版社或 Stanford d.school 官方出品。</span>
-          <span class="privacy-line">记录说明：你的回答会自动保存在当前浏览器本机，用来刷新后继续填写；不会上传到 GitHub。只有当你主动点击 AI 深度蓝图时，当前回答才会发送到你的 AI 后端用于生成分析。点击右上角重新开始按钮即可清空本机记录。</span>
+          <span class="privacy-line">记录说明：你的回答会自动保存在当前浏览器本机，用来刷新后继续填写；不会上传到 GitHub。提交关键节点时，相关回答会发送到 AI 后端生成短追问；点击 AI 深度蓝图时，当前回答会发送到 AI 后端生成完整分析。点击右上角重新开始按钮即可清空本机记录。</span>
         `.trim();
       } else {
         els.openingNote.style.display = "none";
@@ -2606,6 +2658,90 @@
       }
     }
 
+    function hashText(text) {
+      let hash = 2166136261;
+      for (let index = 0; index < text.length; index += 1) {
+        hash ^= text.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0).toString(36);
+    }
+
+    function coachInputForStep(stepId) {
+      const answers = state.answers || {};
+      if (stepId === "coreProblem") {
+        return {
+          dashboard: answers.dashboard,
+          coreProblem: answers.coreProblem
+        };
+      }
+      if (stepId === "lifeview") {
+        return {
+          coreProblem: answers.coreProblem,
+          workview: answers.workview,
+          lifeview: answers.lifeview
+        };
+      }
+      if (stepId === "energy") {
+        return {
+          flow: answers.flow,
+          energy: answers.energy
+        };
+      }
+      if (stepId === "odyssey") {
+        return {
+          anchor: answers.anchor,
+          odyssey: answers.odyssey
+        };
+      }
+      return { [stepId]: answers[stepId] };
+    }
+
+    function coachSignature(stepId) {
+      return hashText(JSON.stringify(coachInputForStep(stepId)));
+    }
+
+    function shouldUseAiCoach(step) {
+      return AI_COACH_STEPS.has(step.id);
+    }
+
+    function renderCoachFeedback(coachState) {
+      if (!coachState) return "";
+      if (coachState.status === "loading") {
+        return `
+          <div class="coach-card is-loading">
+            <span class="coach-label">AI 关键追问</span>
+            <p>AI 正在做一次短判断：它会补一个关键观察、一个追问和一个低成本原型动作。</p>
+          </div>
+        `;
+      }
+      if (coachState.status === "error") {
+        return `
+          <div class="coach-card is-muted">
+            <span class="coach-label">AI 关键追问</span>
+            <p>${escapeHTML(coachState.error || "这次 AI 追问暂时不可用。你可以继续往下走，固定流程不会受影响。")}</p>
+          </div>
+        `;
+      }
+      const coach = coachState.result || {};
+      return `
+        <div class="coach-card">
+          <span class="coach-label">AI 关键追问</span>
+          <p class="coach-title">${escapeHTML(coach.headline || "值得停一下")}</p>
+          <p>${escapeHTML(coach.reflection || "")}</p>
+          <p><strong>追问：</strong>${escapeHTML(coach.question || "")}</p>
+          <p><strong>小原型：</strong>${escapeHTML(coach.prototype || "")}</p>
+          <p><strong>提醒：</strong>${escapeHTML(coach.watchout || "")}</p>
+        </div>
+      `;
+    }
+
+    function updateStepFeedback(step) {
+      const base = makeFeedback(step);
+      const coach = shouldUseAiCoach(step) ? state.aiCoach?.[step.id] : null;
+      state.feedback[step.id] = `${base}${renderCoachFeedback(coach)}`;
+    }
+
     function submitCurrentStep() {
       const step = currentStep();
       if (state.mode === "feedback") {
@@ -2624,8 +2760,20 @@
         state.problem = classifyProblem(state.answers.coreProblem);
       }
 
-      const feedback = makeFeedback(step);
-      state.feedback[step.id] = feedback;
+      let shouldRequestCoach = false;
+      if (shouldUseAiCoach(step)) {
+        const signature = coachSignature(step.id);
+        const existing = state.aiCoach?.[step.id];
+        if (!existing || existing.signature !== signature || existing.status === "error") {
+          state.aiCoach[step.id] = {
+            signature,
+            status: "loading",
+            requestedAt: new Date().toISOString()
+          };
+          shouldRequestCoach = true;
+        }
+      }
+      updateStepFeedback(step);
       markCompleted(step.id);
       state.mode = "feedback";
 
@@ -2634,6 +2782,7 @@
       }
 
       render();
+      if (shouldRequestCoach) requestAiCoach(step.id, state.aiCoach[step.id].signature);
     }
 
     function collectCurrentInput(step) {
@@ -2905,7 +3054,7 @@
           <h2>支持作者</h2>
           <p>如果这个小工具陪你看清了一点方向，欢迎去 GitHub 给项目点一个 Star。它不会改变你的人生，但会给作者一点继续把它打磨下去的确定感。</p>
           <p>项目地址：<a class="support-link" href="https://github.com/mostdesign01-sudo/life-design-h5" target="_blank" rel="noopener">https://github.com/mostdesign01-sudo/life-design-h5</a></p>
-          <p class="tiny">隐私提醒：这份 H5 只把填写记录保存在当前浏览器本机，不会把你的回答上传到远端。</p>
+          <p class="tiny">隐私提醒：填写记录默认保存在当前浏览器本机；AI 关键追问和 AI 深度蓝图会把相关回答发送到你的 AI 后端用于生成分析。</p>
         </div>
       `;
     }
@@ -3091,7 +3240,10 @@
 
     function updateQuotaStatus(quota) {
       if (!quota || !els.quotaStatus) return;
-      els.quotaStatus.textContent = `今日免费 ${quota.usedToday}/${quota.dailyFreeLimit}，激活码余量 ${quota.credits} 次，当前可用 ${quota.totalRemaining} 次。`;
+      const coachText = Number.isFinite(Number(quota.coachDailyLimit))
+        ? `关键追问 ${quota.coachUsedToday}/${quota.coachDailyLimit}，`
+        : "";
+      els.quotaStatus.textContent = `${coachText}深度蓝图 ${quota.usedToday}/${quota.dailyFreeLimit}，激活码余量 ${quota.credits} 次。`;
     }
 
     async function redeemActivationCode() {
@@ -3134,6 +3286,67 @@
           preferredStyle: "温暖、犀利、具体，使用人生设计方法，避免鸡汤和空泛建议。"
         }
       };
+    }
+
+    function buildCoachPayload(stepId) {
+      return {
+        version: "life-design-h5-v1",
+        stepId,
+        generatedAt: new Date().toISOString(),
+        answers: coachInputForStep(stepId),
+        problemRadar: state.problem || classifyProblem(state.answers.coreProblem || "")
+      };
+    }
+
+    async function requestAiCoach(stepId, signature) {
+      const url = endpointUrl("/api/coach-step");
+      if (!url) {
+        state.aiCoach[stepId] = {
+          signature,
+          status: "error",
+          error: "AI 接口地址无效，已先保留固定反馈。"
+        };
+        const step = steps.find(item => item.id === stepId);
+        if (step) updateStepFeedback(step);
+        saveState(true);
+        renderFeedback(currentStep());
+        return;
+      }
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Life-Design-User": getAiUserId()
+          },
+          body: JSON.stringify(buildCoachPayload(stepId))
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (data.quota) updateQuotaStatus(data.quota);
+          throw new Error(data.error || data.message || `接口返回 ${response.status}`);
+        }
+        state.aiCoach[stepId] = {
+          signature,
+          status: "done",
+          result: data.coach,
+          model: data.model || "",
+          generatedAt: new Date().toISOString()
+        };
+        updateQuotaStatus(data.quota);
+      } catch (error) {
+        state.aiCoach[stepId] = {
+          signature,
+          status: "error",
+          error: error.message || "AI 关键追问暂时不可用，固定流程可以继续。"
+        };
+      }
+      const step = steps.find(item => item.id === stepId);
+      if (step) updateStepFeedback(step);
+      saveState(true);
+      if (currentStep().id === stepId && state.mode === "feedback") {
+        renderFeedback(currentStep());
+      }
     }
 
     async function generateAiReportFromApi() {

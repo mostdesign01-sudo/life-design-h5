@@ -1,6 +1,6 @@
 # AI 后端服务
 
-这是给阿里云轻量服务器准备的最小 Node.js 后端。它只做一件事：接收 H5 里的结构化回答，调用 OpenAI 兼容的模型接口，返回一份 Markdown 版 AI 深度蓝图。
+这是给阿里云轻量服务器准备的最小 Node.js 后端。它接收 H5 里的结构化回答，调用 OpenAI 兼容的模型接口，返回关键节点短追问或 Markdown 版 AI 深度蓝图。
 
 ## 要求
 
@@ -62,9 +62,11 @@ https://你的域名/api/analyze-life-design
 ## 成本控制
 
 - 默认每个 IP 每小时最多 20 次
-- 默认每个浏览器每天免费 1 次 AI
-- 超出免费次数后，需要激活码增加可用次数
-- 第一版只在最终报告处调用一次 AI，不做逐题实时调用
+- 默认每个浏览器每天免费 4 次 AI 关键追问
+- 默认每个浏览器每天免费 1 次 AI 深度蓝图
+- 默认按北京时间自然日计算每日额度
+- 超出深度蓝图免费次数后，需要激活码增加可用次数
+- 关键追问只返回短 JSON，避免逐题长篇分析导致成本失控
 - API Key 只保存在服务器环境变量里，不要写进前端或 GitHub
 
 ## 激活码
@@ -73,6 +75,8 @@ https://你的域名/api/analyze-life-design
 
 ```bash
 DAILY_FREE_AI_CALLS=1
+DAILY_FREE_COACH_CALLS=4
+QUOTA_TIMEZONE_OFFSET_MINUTES=480
 ACTIVATION_CODES=FRIEND2026:5,SEEDUSER2026:20
 ```
 
