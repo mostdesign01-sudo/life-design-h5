@@ -193,7 +193,7 @@ function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, X-Life-Design-User",
     "Vary": "Origin"
   };
 }

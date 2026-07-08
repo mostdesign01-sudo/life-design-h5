@@ -1842,6 +1842,7 @@
   <script>
     const STORAGE_KEY = "lifeDesignH5StateV1";
     const AI_ENDPOINT_STORAGE_KEY = "lifeDesignAiEndpointV1";
+    const DEFAULT_AI_ENDPOINT = "https://api.mostdesign.cn/api/analyze-life-design";
     const AI_REPORT_STORAGE_KEY = "lifeDesignAiReportV1";
     const AI_USER_STORAGE_KEY = "lifeDesignAnonymousUserV1";
 
@@ -2790,7 +2791,7 @@
     }
 
     function getAiEndpoint() {
-      return localStorage.getItem(AI_ENDPOINT_STORAGE_KEY) || "";
+      return localStorage.getItem(AI_ENDPOINT_STORAGE_KEY) || DEFAULT_AI_ENDPOINT;
     }
 
     function getAiUserId() {
@@ -2805,13 +2806,13 @@
 
     function configureAiEndpoint() {
       const current = getAiEndpoint();
-      const next = prompt("请输入 AI 后端接口地址，例如：https://你的域名/api/analyze-life-design。留空会清除当前配置。", current);
+      const next = prompt("请输入 AI 后端接口地址。留空会恢复默认接口。", current);
       if (next === null) return current;
       const value = next.trim();
       if (!value) {
         localStorage.removeItem(AI_ENDPOINT_STORAGE_KEY);
-        showToast("已清除 AI 接口地址");
-        return "";
+        showToast("已恢复默认 AI 接口");
+        return DEFAULT_AI_ENDPOINT;
       }
       localStorage.setItem(AI_ENDPOINT_STORAGE_KEY, value);
       showToast("AI 接口地址已保存");
@@ -2836,7 +2837,7 @@
     async function refreshQuotaStatus() {
       const url = endpointUrl("/api/quota");
       if (!url || !els.quotaStatus) {
-        if (els.quotaStatus) els.quotaStatus.textContent = "默认每个浏览器每天免费 1 次 AI；配置后端接口后可查询剩余次数。";
+        if (els.quotaStatus) els.quotaStatus.textContent = "默认每个浏览器每天免费 1 次 AI；AI 接口地址无效，请重新配置。";
         return;
       }
       try {
@@ -2847,7 +2848,7 @@
         if (!response.ok) throw new Error(data.error || "额度查询失败");
         updateQuotaStatus(data.quota);
       } catch (error) {
-        els.quotaStatus.textContent = "额度暂时无法查询，请检查 AI 接口配置。";
+        els.quotaStatus.textContent = "额度暂时无法查询，请稍后重试或检查 AI 接口配置。";
       }
     }
 
