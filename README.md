@@ -36,6 +36,17 @@
 
 H5 会把填写进度保存在当前浏览器本机的 `localStorage` 中，用来支持刷新后继续填写。它不会把你的回答上传到服务器、GitHub 或任何远端。点击页面右上角的“重新开始”按钮可以清空本机记录。
 
+## AI 深度蓝图
+
+项目已预留 AI 接入骨架：
+
+- 前端：报告页里的“AI 接口”和“AI 深度蓝图”按钮
+- 后端：[`server/`](server/) 中的 Node.js 最小 API 服务
+- 提示词：[`prompts/life-design-system-prompt.md`](prompts/life-design-system-prompt.md)
+- 方案文档：[`docs/AI_BACKEND_PLAN.md`](docs/AI_BACKEND_PLAN.md)
+
+第一版推荐只在用户完成问答后调用一次 AI，生成更深入的真问题重定义、能量地图、奥德赛计划重写和 90 天原型计划。API Key 只放在后端服务器环境变量中，不要写进前端。
+
 ## 本地使用
 
 直接用浏览器打开 `index.html` 即可。

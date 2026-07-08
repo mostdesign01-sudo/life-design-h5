@@ -770,6 +770,65 @@
       font-weight: 790;
     }
 
+    .ai-report {
+      margin: 22px 24px 0;
+      padding: 18px;
+      border: 1px solid #cfe5de;
+      border-radius: var(--radius);
+      background: #f3fbf8;
+    }
+
+    .ai-report[hidden] {
+      display: none;
+    }
+
+    .ai-report-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .ai-report-title {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.35;
+      font-weight: 790;
+    }
+
+    .ai-report-body {
+      color: #243238;
+      line-height: 1.82;
+    }
+
+    .ai-report-body h2 {
+      margin: 22px 0 8px;
+      font-size: 18px;
+      line-height: 1.35;
+    }
+
+    .ai-report-body h3 {
+      margin: 18px 0 6px;
+      font-size: 15px;
+      line-height: 1.35;
+    }
+
+    .ai-report-body p {
+      margin: 8px 0;
+    }
+
+    .ai-report-body ul,
+    .ai-report-body ol {
+      padding-left: 1.2em;
+    }
+
+    .ai-status {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
     .report-content {
       padding: 26px 28px 34px;
       line-height: 1.82;
@@ -959,6 +1018,7 @@
       .stage-body,
       .stage-foot,
       .report-toolbar,
+      .ai-report,
       .report-content {
         padding-left: 16px;
         padding-right: 16px;
@@ -1127,12 +1187,29 @@
                 <svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2"></path><path d="M12 2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"></path><path d="M12 2v6h6"></path></svg>
                 复制
               </button>
+              <button class="secondary-button" id="aiConfigButton" type="button">
+                <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7a3.5 3.5 0 0 0 0 7Z"></path><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.04.04a2.1 2.1 0 1 1-2.98 2.98l-.04-.04a1.8 1.8 0 0 0-1.98-.36a1.8 1.8 0 0 0-1.1 1.66V21.4a2.1 2.1 0 1 1-4.2 0v-.06A1.8 1.8 0 0 0 8.4 19.7a1.8 1.8 0 0 0-1.98.36l-.04.04a2.1 2.1 0 1 1-2.98-2.98l.04-.04A1.8 1.8 0 0 0 3.8 15.1a1.8 1.8 0 0 0-1.66-1.1H2.1a2.1 2.1 0 1 1 0-4.2h.06A1.8 1.8 0 0 0 3.8 8.7a1.8 1.8 0 0 0-.36-1.98l-.04-.04a2.1 2.1 0 1 1 2.98-2.98l.04.04A1.8 1.8 0 0 0 8.4 4.1a1.8 1.8 0 0 0 1.1-1.66V2.4a2.1 2.1 0 1 1 4.2 0v.06a1.8 1.8 0 0 0 1.1 1.66a1.8 1.8 0 0 0 1.98-.36l.04-.04a2.1 2.1 0 1 1 2.98 2.98l-.04.04a1.8 1.8 0 0 0-.36 1.98a1.8 1.8 0 0 0 1.66 1.1h.06a2.1 2.1 0 1 1 0 4.2h-.06A1.8 1.8 0 0 0 19.4 15Z"></path></svg>
+                AI 接口
+              </button>
+              <button class="primary-button" id="aiButton" type="button">
+                AI 深度蓝图
+                <svg viewBox="0 0 24 24"><path d="M12 3l1.7 5.2L19 10l-5.3 1.8L12 17l-1.7-5.2L5 10l5.3-1.8L12 3Z"></path><path d="M19 15l.9 2.6L22.5 18l-2.6.9L19 21.5l-.9-2.6l-2.6-.9l2.6-.9L19 15Z"></path></svg>
+              </button>
               <button class="primary-button" id="downloadButton" type="button">
                 下载
                 <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
               </button>
             </div>
           </div>
+          <section class="ai-report" id="aiReportBox" hidden>
+            <div class="ai-report-head">
+              <div>
+                <p class="ai-report-title">AI 深度蓝图</p>
+                <div class="ai-status" id="aiStatus">把结构化回答交给后端 AI，生成更细的重定义、矛盾洞察和 90 天原型。</div>
+              </div>
+            </div>
+            <div class="ai-report-body" id="aiReportContent"></div>
+          </section>
           <article class="report-content" id="reportContent"></article>
         </div>
       </section>
@@ -1143,6 +1220,8 @@
 
   <script>
     const STORAGE_KEY = "lifeDesignH5StateV1";
+    const AI_ENDPOINT_STORAGE_KEY = "lifeDesignAiEndpointV1";
+    const AI_REPORT_STORAGE_KEY = "lifeDesignAiReportV1";
 
     const phases = [
       { key: "here", label: "你在这里" },
@@ -1317,7 +1396,12 @@
       jumpReportButton: document.getElementById("jumpReportButton"),
       returnButton: document.getElementById("returnButton"),
       copyButton: document.getElementById("copyButton"),
+      aiConfigButton: document.getElementById("aiConfigButton"),
+      aiButton: document.getElementById("aiButton"),
       downloadButton: document.getElementById("downloadButton"),
+      aiReportBox: document.getElementById("aiReportBox"),
+      aiStatus: document.getElementById("aiStatus"),
+      aiReportContent: document.getElementById("aiReportContent"),
       toast: document.getElementById("toast")
     };
 
@@ -1862,6 +1946,7 @@
       state.reportGeneratedAt = new Date().toISOString();
       const html = generateReport();
       els.reportContent.innerHTML = html;
+      restoreAiReport();
       els.reportMeta.textContent = `生成时间：${formatDateTime(state.reportGeneratedAt)}。这是一版可修改的蓝图，不是终身判决。`;
       els.questionView.style.display = "none";
       els.reportView.classList.add("is-visible");
@@ -2079,8 +2164,158 @@
       }, 1800);
     }
 
+    function getAiEndpoint() {
+      return localStorage.getItem(AI_ENDPOINT_STORAGE_KEY) || "";
+    }
+
+    function configureAiEndpoint() {
+      const current = getAiEndpoint();
+      const next = prompt("请输入 AI 后端接口地址，例如：https://你的域名/api/analyze-life-design。留空会清除当前配置。", current);
+      if (next === null) return current;
+      const value = next.trim();
+      if (!value) {
+        localStorage.removeItem(AI_ENDPOINT_STORAGE_KEY);
+        showToast("已清除 AI 接口地址");
+        return "";
+      }
+      localStorage.setItem(AI_ENDPOINT_STORAGE_KEY, value);
+      showToast("AI 接口地址已保存");
+      return value;
+    }
+
+    function buildAiPayload() {
+      collectCurrentInput(currentStep());
+      const fixedReportText = els.reportContent.innerText.trim() || generateReport().replace(/<[^>]+>/g, "");
+      return {
+        version: "life-design-h5-v1",
+        generatedAt: new Date().toISOString(),
+        answers: state.answers,
+        problemRadar: state.problem || classifyProblem(state.answers.coreProblem || ""),
+        fixedReportText,
+        request: {
+          goal: "请基于结构化回答生成一份更深入、更具体、更个性化的个人人生设计蓝图。",
+          outputLanguage: "zh-CN",
+          preferredStyle: "温暖、犀利、具体，使用人生设计方法，避免鸡汤和空泛建议。"
+        }
+      };
+    }
+
+    async function generateAiReportFromApi() {
+      let endpoint = getAiEndpoint();
+      if (!endpoint) endpoint = configureAiEndpoint();
+      if (!endpoint) return;
+
+      els.aiReportBox.hidden = false;
+      els.aiStatus.textContent = "AI 正在阅读你的回答，生成深度蓝图……";
+      els.aiReportContent.innerHTML = "<p>生成中，请稍等。第一次调用可能需要几十秒。</p>";
+      els.aiButton.disabled = true;
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildAiPayload())
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || data.message || `接口返回 ${response.status}`);
+        }
+        const markdown = data.analysisMarkdown || data.reportMarkdown || data.analysis || data.report || "";
+        if (!markdown.trim()) throw new Error("接口没有返回可展示的分析内容");
+        renderAiReport(markdown, data.model);
+        localStorage.setItem(AI_REPORT_STORAGE_KEY, JSON.stringify({
+          markdown,
+          model: data.model || "",
+          generatedAt: new Date().toISOString()
+        }));
+        showToast("AI 深度蓝图已生成");
+      } catch (error) {
+        els.aiStatus.textContent = "AI 生成失败";
+        els.aiReportContent.innerHTML = `<p>${escapeHTML(error.message || "请检查后端接口、CORS、模型 API Key 和服务器日志。")}</p>`;
+      } finally {
+        els.aiButton.disabled = false;
+      }
+    }
+
+    function restoreAiReport() {
+      try {
+        const raw = localStorage.getItem(AI_REPORT_STORAGE_KEY);
+        if (!raw) {
+          els.aiReportBox.hidden = true;
+          els.aiReportContent.innerHTML = "";
+          return;
+        }
+        const saved = JSON.parse(raw);
+        if (!saved.markdown) return;
+        renderAiReport(saved.markdown, saved.model, saved.generatedAt);
+      } catch (error) {
+        els.aiReportBox.hidden = true;
+      }
+    }
+
+    function renderAiReport(markdown, model = "", generatedAt = "") {
+      els.aiReportBox.hidden = false;
+      const suffix = model ? ` · 模型：${model}` : "";
+      const time = generatedAt ? ` · ${formatDateTime(generatedAt)}` : "";
+      els.aiStatus.textContent = `由后端 AI 基于当前回答生成${suffix}${time}`;
+      els.aiReportContent.innerHTML = markdownToHtml(markdown);
+    }
+
+    function markdownToHtml(markdown) {
+      const lines = String(markdown || "").split(/\r?\n/);
+      const html = [];
+      let listOpen = false;
+
+      function closeList() {
+        if (listOpen) {
+          html.push("</ul>");
+          listOpen = false;
+        }
+      }
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          closeList();
+          return;
+        }
+        if (trimmed.startsWith("### ")) {
+          closeList();
+          html.push(`<h3>${inlineMarkdown(trimmed.slice(4))}</h3>`);
+          return;
+        }
+        if (trimmed.startsWith("## ")) {
+          closeList();
+          html.push(`<h2>${inlineMarkdown(trimmed.slice(3))}</h2>`);
+          return;
+        }
+        if (/^[-*]\s+/.test(trimmed)) {
+          if (!listOpen) {
+            html.push("<ul>");
+            listOpen = true;
+          }
+          html.push(`<li>${inlineMarkdown(trimmed.replace(/^[-*]\s+/, ""))}</li>`);
+          return;
+        }
+        closeList();
+        html.push(`<p>${inlineMarkdown(trimmed)}</p>`);
+      });
+      closeList();
+      return html.join("");
+    }
+
+    function inlineMarkdown(text) {
+      return escapeHTML(text).replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    }
+
+    function getCombinedReportText() {
+      const aiText = els.aiReportBox.hidden ? "" : els.aiReportContent.innerText.trim();
+      const fixedText = els.reportContent.innerText.trim();
+      return [aiText ? `AI 深度蓝图\n\n${aiText}` : "", fixedText].filter(Boolean).join("\n\n---\n\n");
+    }
+
     function copyReport() {
-      const text = els.reportContent.innerText.trim();
+      const text = getCombinedReportText();
       if (!text) {
         showToast("还没有可复制的蓝图");
         return;
@@ -2099,7 +2334,7 @@
     }
 
     function downloadReport() {
-      const text = els.reportContent.innerText.trim() || generateReport().replace(/<[^>]+>/g, "");
+      const text = getCombinedReportText() || generateReport().replace(/<[^>]+>/g, "");
       const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -2115,6 +2350,7 @@
     function resetAll() {
       if (!confirm("确定要清空当前回答并重新开始吗？")) return;
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(AI_REPORT_STORAGE_KEY);
       state = structuredClone(initialState);
       render();
       showToast("已重新开始");
@@ -2128,6 +2364,8 @@
     els.jumpReportButton.addEventListener("click", showReport);
     els.returnButton.addEventListener("click", returnToQuestions);
     els.copyButton.addEventListener("click", copyReport);
+    els.aiConfigButton.addEventListener("click", configureAiEndpoint);
+    els.aiButton.addEventListener("click", generateAiReportFromApi);
     els.downloadButton.addEventListener("click", downloadReport);
 
     render();
