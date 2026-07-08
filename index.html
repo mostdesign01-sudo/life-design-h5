@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="设计人生蓝图是一个受到 Stanford d.school Life Design 方法与《Designing Your Life》启发的中文互动 H5，帮助你看清现状、重构问题、识别能量线索，并生成可行动的人生原型。">
   <title>设计人生蓝图</title>
   <style>
     :root {
@@ -570,6 +571,48 @@
       color: #3a321f;
       line-height: 1.75;
       overflow-wrap: anywhere;
+    }
+
+    .intro-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      margin-bottom: 10px;
+      padding: 5px 10px;
+      border: 1px solid rgba(24, 23, 19, 0.2);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      color: #1f5c54;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .intro-lead {
+      margin: 0;
+      color: #2d2c28;
+      font-size: 15px;
+      line-height: 1.82;
+    }
+
+    .method-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .method-pill-row span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 5px 10px;
+      border: 1px solid rgba(24, 23, 19, 0.16);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.66);
+      color: #3b3a35;
+      font-size: 12px;
+      font-weight: 700;
     }
 
     .form-area {
@@ -2103,7 +2146,20 @@
 
       if (step.id === "dashboard") {
         els.openingNote.style.display = "block";
-        els.openingNote.innerHTML = "这套方法来自斯坦福 d.school 很受欢迎的人生设计课。它的前提很朴素：人生更像一件可以反复设计、低成本试错的作品，不是一道必须算出标准答案的工程题。接下来大概需要 25 到 40 分钟，我们会先看清你现在真实所在的位置，再分清重力问题和可设计的问题，最后生成三个五年版本和本周就能开始的原型行动。你不需要先想清楚自己热爱什么，我们会一边走一边把线索找出来。<span class=\"method-background\"><strong>方法背景：</strong>本工具受到 Bill Burnett 和 Dave Evans 合著的 <em>Designing Your Life: How to Build a Well-Lived, Joyful Life</em> 启发。两位作者把设计思维带入人生选择，强调重构问题、识别重力问题、记录能量、设计多个奥德赛计划，并用低成本原型去验证真实生活。本页面是个人学习与实践项目，不代表作者、出版社或 Stanford d.school 官方出品。</span><span class=\"privacy-line\">记录说明：你的回答会自动保存在当前浏览器本机，用来刷新后继续填写；不会上传到服务器或 GitHub。点击右上角重新开始按钮即可清空本机记录。</span>";
+        els.openingNote.innerHTML = `
+          <div class="intro-eyebrow">源自 Stanford d.school 的 Life Design 方法</div>
+          <p class="intro-lead"><strong>设计人生蓝图</strong> 是一个把《Designing Your Life》中的人生设计框架，转化成中文互动问答与 AI 深度分析的 H5 工具。它不做性格测评，也不替你决定人生，而是带你像设计师一样看清现状、重构问题、识别能量线索，并用低成本原型去验证真正适合自己的下一步。</p>
+          <div class="method-pill-row" aria-label="方法关键词">
+            <span>四个仪表盘</span>
+            <span>重力问题识别</span>
+            <span>工作观与人生观</span>
+            <span>心流与能量地图</span>
+            <span>三套奥德赛计划</span>
+            <span>低成本原型行动</span>
+          </div>
+          <span class="method-background"><strong>方法背景：</strong>这套工具受到 Bill Burnett 和 Dave Evans 合著的 <em>Designing Your Life: How to Build a Well-Lived, Joyful Life</em> 启发。两位作者把设计思维带入人生选择，强调人生不是一道需要算出唯一标准答案的工程题，而是一件可以反复试做、快速反馈、持续迭代的作品。接下来大概需要 25 到 40 分钟，我们会先看清你现在真实所在的位置，再分清重力问题和可设计的问题，最后生成三个五年版本和本周就能开始的原型行动。本页面是个人学习与实践项目，不代表作者、出版社或 Stanford d.school 官方出品。</span>
+          <span class="privacy-line">记录说明：你的回答会自动保存在当前浏览器本机，用来刷新后继续填写；不会上传到 GitHub。只有当你主动点击 AI 深度蓝图时，当前回答才会发送到你的 AI 后端用于生成分析。点击右上角重新开始按钮即可清空本机记录。</span>
+        `.trim();
       } else {
         els.openingNote.style.display = "none";
         els.openingNote.textContent = "";
