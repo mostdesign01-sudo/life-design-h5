@@ -1,0 +1,2087 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>人生设计蓝图 H5</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8f7;
+      --surface: #ffffff;
+      --surface-soft: #edf5f2;
+      --ink: #172126;
+      --muted: #69747c;
+      --line: #dce6e2;
+      --teal: #14877e;
+      --teal-dark: #0f665f;
+      --coral: #e25b4d;
+      --amber: #d89822;
+      --blue: #3476d9;
+      --green: #3a8f50;
+      --shadow: 0 18px 46px rgba(24, 40, 37, 0.12);
+      --radius: 8px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--bg);
+    }
+
+    body {
+      min-height: 100%;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-size: 16px;
+      letter-spacing: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(20, 135, 126, 0.08), transparent 32%),
+        linear-gradient(225deg, rgba(226, 91, 77, 0.08), transparent 38%),
+        var(--bg);
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+
+    .app {
+      width: min(1180px, calc(100% - 32px));
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: calc(18px + var(--safe-top)) 0 calc(28px + var(--safe-bottom));
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 16px;
+      min-height: 70px;
+      padding: 8px 0 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.45), transparent 42%),
+        linear-gradient(135deg, var(--teal), var(--blue));
+      display: grid;
+      place-items: center;
+      box-shadow: 0 12px 26px rgba(20, 135, 126, 0.24);
+      flex: 0 0 auto;
+    }
+
+    .mark svg {
+      width: 27px;
+      height: 27px;
+      stroke: #fff;
+      fill: none;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.2;
+      font-weight: 760;
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .icon-button,
+    .text-button,
+    .primary-button,
+    .secondary-button {
+      min-height: 42px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .icon-button {
+      width: 42px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line);
+    }
+
+    .icon-button svg,
+    .text-button svg,
+    .primary-button svg,
+    .secondary-button svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex: 0 0 auto;
+    }
+
+    .text-button,
+    .secondary-button {
+      padding: 0 14px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.74);
+      border: 1px solid var(--line);
+    }
+
+    .primary-button {
+      padding: 0 18px;
+      color: #fff;
+      background: var(--teal);
+      box-shadow: 0 14px 28px rgba(20, 135, 126, 0.24);
+    }
+
+    .primary-button:hover,
+    .secondary-button:hover,
+    .text-button:hover,
+    .icon-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .primary-button:hover {
+      background: var(--teal-dark);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .rail,
+    .stage {
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(220, 230, 226, 0.92);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .rail {
+      position: sticky;
+      top: 14px;
+    }
+
+    .panel {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel:last-child {
+      border-bottom: 0;
+    }
+
+    .panel-title {
+      margin: 0 0 12px;
+      font-size: 14px;
+      color: var(--ink);
+      font-weight: 760;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .tiny {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .progress-shell {
+      height: 10px;
+      border-radius: 999px;
+      background: #e7eeeb;
+      overflow: hidden;
+      margin: 10px 0 8px;
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--teal), var(--blue), var(--coral));
+      transition: width 280ms ease;
+    }
+
+    .phase-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+      position: relative;
+    }
+
+    .phase-item {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 9px;
+      align-items: center;
+      color: var(--muted);
+      min-height: 34px;
+    }
+
+    .phase-dot {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #e5ece9;
+      color: #6d777f;
+      font-size: 12px;
+      font-weight: 760;
+      border: 1px solid #d7e3de;
+    }
+
+    .phase-name {
+      font-size: 13px;
+      font-weight: 680;
+      line-height: 1.3;
+    }
+
+    .phase-item.is-active {
+      color: var(--ink);
+    }
+
+    .phase-item.is-active .phase-dot {
+      background: var(--teal);
+      color: #fff;
+      border-color: var(--teal);
+      box-shadow: 0 8px 18px rgba(20, 135, 126, 0.25);
+    }
+
+    .phase-item.is-done .phase-dot {
+      background: #dff1ea;
+      color: var(--teal-dark);
+      border-color: #bde2d5;
+    }
+
+    .gauge-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .gauge {
+      display: grid;
+      grid-template-columns: 52px 1fr;
+      gap: 10px;
+      align-items: center;
+      min-height: 58px;
+    }
+
+    .gauge-ring {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(var(--gauge-color) var(--gauge-value), #e6eeea 0);
+      position: relative;
+    }
+
+    .gauge-ring::after {
+      content: "";
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--surface);
+      position: absolute;
+      inset: 8px;
+    }
+
+    .gauge-score {
+      position: relative;
+      z-index: 1;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .gauge-name {
+      font-size: 13px;
+      font-weight: 740;
+      line-height: 1.2;
+    }
+
+    .gauge-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+      min-height: 16px;
+    }
+
+    .classification {
+      display: grid;
+      gap: 10px;
+    }
+
+    .meter-row {
+      display: grid;
+      gap: 5px;
+    }
+
+    .meter-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .meter-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #e8efec;
+      overflow: hidden;
+    }
+
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      transition: width 260ms ease;
+    }
+
+    .meter-fill.gravity {
+      background: var(--coral);
+    }
+
+    .meter-fill.designable {
+      background: var(--teal);
+    }
+
+    .chip-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      min-height: 30px;
+    }
+
+    .chip {
+      max-width: 100%;
+      min-height: 26px;
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #eef5f2;
+      color: #34504c;
+      font-size: 12px;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+
+    .stage {
+      min-height: 720px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    .stage-head {
+      padding: 24px 24px 18px;
+      background:
+        linear-gradient(115deg, rgba(20, 135, 126, 0.12), rgba(52, 118, 217, 0.06) 48%, rgba(226, 91, 77, 0.08)),
+        var(--surface);
+      border-bottom: 1px solid var(--line);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .route-art {
+      position: absolute;
+      inset: 0 0 auto auto;
+      width: 310px;
+      height: 142px;
+      opacity: 0.55;
+      pointer-events: none;
+    }
+
+    .route-art path {
+      fill: none;
+      stroke: rgba(20, 135, 126, 0.55);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-dasharray: 6 8;
+    }
+
+    .route-art circle {
+      fill: rgba(226, 91, 77, 0.82);
+    }
+
+    .stage-kicker {
+      position: relative;
+      z-index: 1;
+      color: var(--teal-dark);
+      font-size: 13px;
+      font-weight: 760;
+      margin-bottom: 9px;
+    }
+
+    .question-title {
+      position: relative;
+      z-index: 1;
+      max-width: 720px;
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.25;
+      font-weight: 790;
+    }
+
+    .question-copy {
+      position: relative;
+      z-index: 1;
+      max-width: 760px;
+      margin: 12px 0 0;
+      color: #3f5056;
+      line-height: 1.72;
+    }
+
+    .stage-body {
+      padding: 24px;
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .opening {
+      padding: 16px;
+      border: 1px solid #dbe9e4;
+      background: #f4faf7;
+      border-radius: var(--radius);
+      color: #314a45;
+      line-height: 1.75;
+    }
+
+    .form-area {
+      display: grid;
+      gap: 16px;
+    }
+
+    .slider-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .slider-box,
+    .text-box,
+    .choice-box,
+    .odyssey-plan,
+    .column-box {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 15px;
+    }
+
+    .slider-label,
+    .field-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-weight: 750;
+      font-size: 14px;
+    }
+
+    .score-pill {
+      min-width: 42px;
+      height: 28px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #eef5f2;
+      color: var(--teal-dark);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--teal);
+    }
+
+    textarea,
+    input[type="text"] {
+      width: 100%;
+      color: var(--ink);
+      background: #fbfdfc;
+      border: 1px solid #d8e4df;
+      border-radius: 8px;
+      outline: none;
+      transition: border 150ms ease, box-shadow 150ms ease;
+    }
+
+    textarea {
+      min-height: 126px;
+      resize: vertical;
+      line-height: 1.65;
+      padding: 12px 13px;
+    }
+
+    input[type="text"] {
+      min-height: 42px;
+      padding: 0 12px;
+    }
+
+    textarea:focus,
+    input[type="text"]:focus {
+      border-color: rgba(20, 135, 126, 0.6);
+      box-shadow: 0 0 0 3px rgba(20, 135, 126, 0.12);
+    }
+
+    .hint {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .choice-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .choice-option {
+      min-height: 86px;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid #d8e4df;
+      background: #fbfdfc;
+      text-align: left;
+      color: var(--ink);
+      display: grid;
+      gap: 6px;
+      align-content: start;
+    }
+
+    .choice-option.is-selected {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px rgba(20, 135, 126, 0.12);
+      background: #f2fbf7;
+    }
+
+    .choice-title {
+      font-weight: 780;
+      line-height: 1.3;
+    }
+
+    .choice-desc {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .two-columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .odyssey-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .odyssey-plan {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .plan-tag {
+      width: fit-content;
+      max-width: 100%;
+      padding: 4px 8px;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--teal);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .plan-tag.alt {
+      background: var(--blue);
+    }
+
+    .plan-tag.free {
+      background: var(--coral);
+    }
+
+    .pick-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .radio-tile {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 8px;
+      border: 1px solid #d8e4df;
+      border-radius: 8px;
+      background: #fbfdfc;
+      font-size: 13px;
+      font-weight: 720;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .radio-tile input {
+      margin: 0;
+      accent-color: var(--teal);
+    }
+
+    .feedback {
+      display: none;
+      border-left: 4px solid var(--teal);
+      background: #f1faf7;
+      border-radius: 8px;
+      padding: 14px 15px;
+      color: #253f3b;
+      line-height: 1.72;
+    }
+
+    .feedback.is-visible {
+      display: block;
+    }
+
+    .feedback strong {
+      color: var(--teal-dark);
+    }
+
+    .warning {
+      display: none;
+      border-left: 4px solid var(--coral);
+      background: #fff5f3;
+      border-radius: 8px;
+      padding: 12px 13px;
+      color: #68302b;
+      line-height: 1.55;
+    }
+
+    .warning.is-visible {
+      display: block;
+    }
+
+    .stage-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 24px;
+      border-top: 1px solid var(--line);
+      background: rgba(250, 252, 251, 0.82);
+    }
+
+    .left-actions,
+    .right-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .report-view {
+      display: none;
+      padding: 0;
+    }
+
+    .report-view.is-visible {
+      display: block;
+    }
+
+    .report-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfdfc;
+    }
+
+    .report-title {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.35;
+      font-weight: 790;
+    }
+
+    .report-content {
+      padding: 26px 28px 34px;
+      line-height: 1.82;
+      color: #243238;
+    }
+
+    .report-content h2 {
+      margin: 28px 0 10px;
+      font-size: 19px;
+      line-height: 1.35;
+    }
+
+    .report-content h2:first-child {
+      margin-top: 0;
+    }
+
+    .report-content h3 {
+      margin: 20px 0 8px;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .report-content p {
+      margin: 8px 0;
+    }
+
+    .report-content ul,
+    .report-content ol {
+      padding-left: 1.2em;
+    }
+
+    .report-content li {
+      margin: 6px 0;
+    }
+
+    .quote {
+      padding: 13px 14px;
+      border-left: 4px solid var(--amber);
+      background: #fffaf0;
+      border-radius: 8px;
+      margin: 14px 0;
+    }
+
+    .empty-state {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(22px + var(--safe-bottom));
+      transform: translateX(-50%) translateY(16px);
+      background: rgba(23, 33, 38, 0.94);
+      color: #fff;
+      min-height: 40px;
+      padding: 9px 14px;
+      border-radius: 8px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+      z-index: 30;
+      max-width: min(520px, calc(100% - 32px));
+      text-align: center;
+      line-height: 1.45;
+    }
+
+    .toast.is-visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @media (max-width: 940px) {
+      .app {
+        width: min(100% - 22px, 760px);
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+
+      .top-actions {
+        justify-content: flex-start;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .stage {
+        order: 1;
+      }
+
+      .rail {
+        position: static;
+        order: 2;
+      }
+
+      .stage {
+        min-height: 680px;
+      }
+
+      .odyssey-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        width: 100%;
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+
+      .topbar {
+        padding-left: 2px;
+        padding-right: 2px;
+      }
+
+      .brand {
+        align-items: flex-start;
+      }
+
+      .mark {
+        width: 38px;
+        height: 38px;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+
+      .subtitle {
+        max-width: 310px;
+      }
+
+      .rail,
+      .stage {
+        border-radius: 8px;
+      }
+
+      .stage-head,
+      .stage-body,
+      .stage-foot,
+      .report-toolbar,
+      .report-content {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .question-title {
+        font-size: 23px;
+      }
+
+      .question-copy {
+        font-size: 15px;
+      }
+
+      .slider-grid,
+      .choice-list,
+      .two-columns,
+      .pick-row {
+        grid-template-columns: 1fr;
+      }
+
+      .stage-foot,
+      .report-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .left-actions,
+      .right-actions {
+        width: 100%;
+      }
+
+      .primary-button,
+      .secondary-button,
+      .text-button {
+        flex: 1 1 auto;
+      }
+
+      .route-art {
+        width: 240px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32">
+            <path d="M5 22c6-12 11-14 22-15"></path>
+            <path d="M9 23c4 3 9 4 14 2"></path>
+            <path d="M19 7l8 0l0 8"></path>
+          </svg>
+        </div>
+        <div>
+          <h1>个人人生设计蓝图</h1>
+          <p class="subtitle">从“你在这里”开始，把人生当作可以反复试做的作品。</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-button" id="saveButton" type="button" title="保存当前进度" aria-label="保存当前进度">
+          <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"></path><path d="M17 21v-8H7v8"></path><path d="M7 3v5h8"></path></svg>
+        </button>
+        <button class="icon-button" id="resetButton" type="button" title="重新开始" aria-label="重新开始">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path></svg>
+        </button>
+        <button class="text-button" id="jumpReportButton" type="button">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path><path d="M8 9h2"></path></svg>
+          看蓝图
+        </button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="rail" aria-label="人生设计进度">
+        <section class="panel">
+          <div class="panel-title">
+            <span>设计进度</span>
+            <span class="tiny" id="stepCounter">1 / 9</span>
+          </div>
+          <div class="progress-shell" aria-hidden="true">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <div class="phase-list" id="phaseList"></div>
+        </section>
+
+        <section class="panel">
+          <p class="panel-title">四个仪表盘</p>
+          <div class="gauge-grid" id="gaugeGrid"></div>
+        </section>
+
+        <section class="panel">
+          <p class="panel-title">真问题雷达</p>
+          <div class="classification">
+            <div class="meter-row">
+              <div class="meter-label"><span>重力成分</span><span id="gravityValue">待判断</span></div>
+              <div class="meter-track"><div class="meter-fill gravity" id="gravityFill"></div></div>
+            </div>
+            <div class="meter-row">
+              <div class="meter-label"><span>可设计成分</span><span id="designValue">待判断</span></div>
+              <div class="meter-track"><div class="meter-fill designable" id="designFill"></div></div>
+            </div>
+            <div class="tiny" id="problemHint">先把困扰说出来，之后再切分现实边界与行动空间。</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <p class="panel-title">能量线索</p>
+          <div class="chip-cloud" id="energyChips">
+            <span class="empty-state">心流、回血、抽干和锚点会在后半程浮出来。</span>
+          </div>
+        </section>
+      </aside>
+
+      <section class="stage" id="questionStage">
+        <div id="questionView">
+          <div class="stage-head">
+            <svg class="route-art" viewBox="0 0 320 150" aria-hidden="true">
+              <path d="M20 112C62 60 98 55 124 82C155 115 194 105 220 65C244 28 281 34 300 48"></path>
+              <circle cx="20" cy="112" r="5"></circle>
+              <circle cx="124" cy="82" r="5"></circle>
+              <circle cx="220" cy="65" r="5"></circle>
+              <circle cx="300" cy="48" r="5"></circle>
+            </svg>
+            <div class="stage-kicker" id="phaseKicker">第一阶段：你在这里</div>
+            <h2 class="question-title" id="questionTitle"></h2>
+            <p class="question-copy" id="questionCopy"></p>
+          </div>
+          <div class="stage-body">
+            <div class="opening" id="openingNote"></div>
+            <div class="form-area" id="formArea"></div>
+            <div class="warning" id="warningBox"></div>
+            <div class="feedback" id="feedbackBox"></div>
+          </div>
+          <div class="stage-foot">
+            <div class="left-actions">
+              <button class="secondary-button" id="backButton" type="button">
+                <svg viewBox="0 0 24 24"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+                上一题
+              </button>
+            </div>
+            <div class="right-actions">
+              <button class="secondary-button" id="skipButton" type="button">
+                跳过
+              </button>
+              <button class="primary-button" id="mainButton" type="button">
+                提交这一题
+                <svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="report-view" id="reportView">
+          <div class="report-toolbar">
+            <div>
+              <p class="report-title">《个人人生设计蓝图》</p>
+              <div class="tiny" id="reportMeta">基于当前回答生成，可继续回到问答修订。</div>
+            </div>
+            <div class="right-actions">
+              <button class="secondary-button" id="returnButton" type="button">
+                <svg viewBox="0 0 24 24"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+                回到问答
+              </button>
+              <button class="secondary-button" id="copyButton" type="button">
+                <svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2"></path><path d="M12 2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"></path><path d="M12 2v6h6"></path></svg>
+                复制
+              </button>
+              <button class="primary-button" id="downloadButton" type="button">
+                下载
+                <svg viewBox="0 0 24 24"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
+              </button>
+            </div>
+          </div>
+          <article class="report-content" id="reportContent"></article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const STORAGE_KEY = "lifeDesignH5StateV1";
+
+    const phases = [
+      { key: "here", label: "你在这里" },
+      { key: "compass", label: "你的指南针" },
+      { key: "wayfinding", label: "寻路与能量" },
+      { key: "odyssey", label: "多种可能" },
+      { key: "blueprint", label: "蓝图初稿" }
+    ];
+
+    const dashboardItems = [
+      { key: "health", label: "健康", color: "#14877e", detail: "身体、情绪、心理" },
+      { key: "work", label: "工作", color: "#3476d9", detail: "投入、价值、回报" },
+      { key: "play", label: "娱乐", color: "#d89822", detail: "纯粹为了快乐" },
+      { key: "love", label: "爱", color: "#e25b4d", detail: "双向连接" }
+    ];
+
+    const steps = [
+      {
+        id: "dashboard",
+        phase: "here",
+        kicker: "第一阶段：你在这里",
+        title: "先看四个仪表盘：健康、工作、娱乐、爱，各给自己打几分？",
+        copy: "0 到 10 分，0 是很糟，10 是很充盈。健康包含身体、情绪和心理；娱乐是纯粹为了快乐；爱是你和他人之间双向流动的连接。最后写一句：哪一项已经亮红灯，为什么。",
+        type: "dashboard",
+        required: true
+      },
+      {
+        id: "coreProblem",
+        phase: "here",
+        kicker: "第一阶段：你在这里",
+        title: "现在最让你焦虑、最想解决的那个人生问题是什么？",
+        copy: "先不要急着把它说漂亮。请尽量具体：它发生在哪个场景里，影响了你什么，你已经为它耗掉了多少力气。",
+        type: "textarea",
+        placeholder: "比如：我明明想换一种工作方式，但一直卡在收入、安全感、家人期待和自我怀疑之间……",
+        required: true
+      },
+      {
+        id: "reverseConsent",
+        phase: "here",
+        kicker: "第一阶段：你在这里",
+        title: "你愿意做一段短短的反向推演吗？",
+        copy: "这一步不是吓自己，而是看清维持现状的真实代价。如果你今天状态不适合，我们直接跳过，先把注意力放回能让你回血的东西。",
+        type: "choice",
+        choices: [
+          { value: "yes", title: "愿意，短一点", desc: "看一眼五年后不改变的周二，然后立刻转回正向设计。" },
+          { value: "skip", title: "今天先跳过", desc: "保留能量，直接进入工作观和人生观。" }
+        ],
+        required: true
+      },
+      {
+        id: "reverseTuesday",
+        phase: "here",
+        kicker: "第一阶段：你在这里",
+        title: "如果未来五年什么都不变，一个普通周二会怎么过？",
+        copy: "从早上醒来到晚上十点，写身体是什么感觉，身边有谁，心里在想什么。写完之后，再补一句：这幅画面里，最不能再继续被你忽略的是什么。",
+        type: "textarea",
+        placeholder: "五年后的一个周二，我醒来时……",
+        required: true,
+        conditional: answers => answers.reverseConsent === "yes"
+      },
+      {
+        id: "workview",
+        phase: "compass",
+        kicker: "第二阶段：你的指南针",
+        title: "工作对你到底意味着什么？",
+        copy: "先不谈具体职位。你为什么工作？工作和金钱、他人、世界分别是什么关系？什么样的工作会让你觉得自己不是只在消耗生命？",
+        type: "textarea",
+        placeholder: "对我来说，工作意味着……我需要钱是因为……我希望工作和别人/世界的关系是……",
+        required: true
+      },
+      {
+        id: "lifeview",
+        phase: "compass",
+        kicker: "第二阶段：你的指南针",
+        title: "你觉得人生的意义或目的是什么？",
+        copy: "你和家人、亲密关系、更大的世界怎么连接？到很久以后，什么东西会让你觉得这一生没有白活？",
+        type: "textarea",
+        placeholder: "如果这一生没有白活，可能是因为……",
+        required: true
+      },
+      {
+        id: "flow",
+        phase: "wayfinding",
+        kicker: "第三阶段：寻路",
+        title: "回忆几个你完全投入、忘记时间、做完很满足的时刻。",
+        copy: "请写具体事件：当时在做什么、和谁、在什么环境里。激情不用先出现，心流会更诚实地泄露线索。",
+        type: "textarea",
+        placeholder: "最近一次我忘记时间，是在……那时我正在……身边有……",
+        required: true
+      },
+      {
+        id: "energy",
+        phase: "wayfinding",
+        kicker: "第三阶段：寻路",
+        title: "哪些事让你回血，哪些事把你抽干？",
+        copy: "注意把“擅长”和“热爱”拆开。有些事你做得很好，但做完人会变灰；有些事很累，却让你更像自己。",
+        type: "twoColumn",
+        columns: [
+          { key: "energizing", label: "虽然累但精神亢奋、回血的事", placeholder: "例如：和高手深聊、做一个复杂方案、教别人学会某件事……" },
+          { key: "draining", label: "即使做得不错也会抽干你的事", placeholder: "例如：长期无意义沟通、只为证明自己、重复填表……" }
+        ],
+        required: true
+      },
+      {
+        id: "anchor",
+        phase: "odyssey",
+        kicker: "第四阶段：摆脱困境",
+        title: "有没有一个你死守很久、其实早就行不通的方案或执念？",
+        copy: "它可能是一份工作、一种证明自己的方式、一个必须被认可的身份。请写：你为什么不肯放手，以及这个执念背后真正想要的东西。",
+        type: "textarea",
+        placeholder: "我一直不肯放手的是……因为它代表……但它背后我真正想要的可能是……",
+        required: true
+      },
+      {
+        id: "odyssey",
+        phase: "odyssey",
+        kicker: "第四阶段：奥德赛计划",
+        title: "写出三个完全不同、但你都真心愿意的五年人生版本。",
+        copy: "第一个是你已经在走或盘算很久的路；第二个是假如第一条突然消失，你会去做什么；第三个是假如不用考虑钱，也不用在乎别人怎么看，你想过的生活。三个都要是 A 计划，不是备胎。",
+        type: "odyssey",
+        required: true
+      }
+    ];
+
+    const initialState = {
+      currentStepId: "dashboard",
+      mode: "input",
+      answers: {
+        dashboard: {
+          health: 5,
+          work: 5,
+          play: 5,
+          love: 5,
+          note: ""
+        }
+      },
+      completed: [],
+      feedback: {},
+      problem: null,
+      reportGeneratedAt: null
+    };
+
+    let state = loadState();
+
+    const els = {
+      stepCounter: document.getElementById("stepCounter"),
+      progressBar: document.getElementById("progressBar"),
+      phaseList: document.getElementById("phaseList"),
+      gaugeGrid: document.getElementById("gaugeGrid"),
+      gravityValue: document.getElementById("gravityValue"),
+      gravityFill: document.getElementById("gravityFill"),
+      designValue: document.getElementById("designValue"),
+      designFill: document.getElementById("designFill"),
+      problemHint: document.getElementById("problemHint"),
+      energyChips: document.getElementById("energyChips"),
+      phaseKicker: document.getElementById("phaseKicker"),
+      questionTitle: document.getElementById("questionTitle"),
+      questionCopy: document.getElementById("questionCopy"),
+      openingNote: document.getElementById("openingNote"),
+      formArea: document.getElementById("formArea"),
+      warningBox: document.getElementById("warningBox"),
+      feedbackBox: document.getElementById("feedbackBox"),
+      backButton: document.getElementById("backButton"),
+      skipButton: document.getElementById("skipButton"),
+      mainButton: document.getElementById("mainButton"),
+      questionView: document.getElementById("questionView"),
+      reportView: document.getElementById("reportView"),
+      reportContent: document.getElementById("reportContent"),
+      reportMeta: document.getElementById("reportMeta"),
+      saveButton: document.getElementById("saveButton"),
+      resetButton: document.getElementById("resetButton"),
+      jumpReportButton: document.getElementById("jumpReportButton"),
+      returnButton: document.getElementById("returnButton"),
+      copyButton: document.getElementById("copyButton"),
+      downloadButton: document.getElementById("downloadButton"),
+      toast: document.getElementById("toast")
+    };
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return structuredClone(initialState);
+        const parsed = JSON.parse(raw);
+        return {
+          ...structuredClone(initialState),
+          ...parsed,
+          answers: {
+            ...structuredClone(initialState.answers),
+            ...(parsed.answers || {})
+          },
+          completed: Array.isArray(parsed.completed) ? parsed.completed : [],
+          feedback: parsed.feedback || {}
+        };
+      } catch (error) {
+        return structuredClone(initialState);
+      }
+    }
+
+    function saveState(silent = false) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if (!silent) showToast("已保存当前进度");
+    }
+
+    function availableSteps() {
+      return steps.filter(step => !step.conditional || step.conditional(state.answers));
+    }
+
+    function currentStep() {
+      const list = availableSteps();
+      return list.find(step => step.id === state.currentStepId) || list[0];
+    }
+
+    function currentStepIndex() {
+      return availableSteps().findIndex(step => step.id === currentStep().id);
+    }
+
+    function stepAnswer(stepId) {
+      return state.answers[stepId];
+    }
+
+    function isCompleted(stepId) {
+      return state.completed.includes(stepId);
+    }
+
+    function markCompleted(stepId) {
+      if (!state.completed.includes(stepId)) state.completed.push(stepId);
+    }
+
+    function render() {
+      const step = currentStep();
+      const list = availableSteps();
+      const index = currentStepIndex();
+      const progress = list.length <= 1 ? 0 : Math.round((state.completed.filter(id => list.some(s => s.id === id)).length / list.length) * 100);
+
+      els.stepCounter.textContent = `${Math.min(index + 1, list.length)} / ${list.length}`;
+      els.progressBar.style.width = `${progress}%`;
+      renderPhases();
+      renderGauges();
+      renderProblemRadar();
+      renderEnergyChips();
+
+      els.questionView.style.display = "block";
+      els.reportView.classList.remove("is-visible");
+      els.phaseKicker.textContent = step.kicker;
+      els.questionTitle.textContent = step.title;
+      els.questionCopy.textContent = step.copy;
+      els.warningBox.classList.remove("is-visible");
+      els.warningBox.textContent = "";
+
+      if (step.id === "dashboard") {
+        els.openingNote.style.display = "block";
+        els.openingNote.innerHTML = "这套方法来自斯坦福 d.school 很受欢迎的人生设计课。它的前提很朴素：人生更像一件可以反复设计、低成本试错的作品，不是一道必须算出标准答案的工程题。接下来大概需要 25 到 40 分钟，我们会先看清你现在真实所在的位置，再分清重力问题和可设计的问题，最后生成三个五年版本和本周就能开始的原型行动。你不需要先想清楚自己热爱什么，我们会一边走一边把线索找出来。";
+      } else {
+        els.openingNote.style.display = "none";
+        els.openingNote.textContent = "";
+      }
+
+      renderForm(step);
+      renderFeedback(step);
+
+      els.backButton.disabled = index === 0 || state.mode === "feedback";
+      els.skipButton.style.display = step.required || state.mode === "feedback" ? "none" : "inline-flex";
+      els.mainButton.innerHTML = state.mode === "feedback"
+        ? '继续下一题 <svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>'
+        : `${step.id === "odyssey" ? "生成蓝图" : "提交这一题"} <svg viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>`;
+
+      saveState(true);
+    }
+
+    function renderPhases() {
+      const list = availableSteps();
+      const current = currentStep();
+      const activePhaseIndex = phases.findIndex(phase => phase.key === current.phase);
+      els.phaseList.innerHTML = phases.map((phase, index) => {
+        const phaseSteps = list.filter(step => step.phase === phase.key);
+        const done = phaseSteps.length > 0 && phaseSteps.every(step => isCompleted(step.id));
+        const active = phase.key === current.phase || (phase.key === "blueprint" && allRequiredDone());
+        const cls = active ? "is-active" : done || index < activePhaseIndex ? "is-done" : "";
+        return `
+          <div class="phase-item ${cls}">
+            <div class="phase-dot">${done ? "✓" : index + 1}</div>
+            <div class="phase-name">${escapeHTML(phase.label)}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderGauges() {
+      const scores = state.answers.dashboard || initialState.answers.dashboard;
+      els.gaugeGrid.innerHTML = dashboardItems.map(item => {
+        const score = Number(scores[item.key] ?? 5);
+        const note = score <= 3 ? "红灯" : score <= 6 ? "待照看" : "有支撑";
+        return `
+          <div class="gauge">
+            <div class="gauge-ring" style="--gauge-color:${item.color};--gauge-value:${score * 10}%">
+              <span class="gauge-score">${score}</span>
+            </div>
+            <div>
+              <div class="gauge-name">${escapeHTML(item.label)}</div>
+              <div class="gauge-note">${escapeHTML(note)} · ${escapeHTML(item.detail)}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderProblemRadar() {
+      if (!state.problem) {
+        els.gravityValue.textContent = "待判断";
+        els.designValue.textContent = "待判断";
+        els.gravityFill.style.width = "0%";
+        els.designFill.style.width = "0%";
+        els.problemHint.textContent = "先把困扰说出来，之后再切分现实边界与行动空间。";
+        return;
+      }
+      els.gravityValue.textContent = `${state.problem.gravity}%`;
+      els.designValue.textContent = `${state.problem.designable}%`;
+      els.gravityFill.style.width = `${state.problem.gravity}%`;
+      els.designFill.style.width = `${state.problem.designable}%`;
+      els.problemHint.textContent = state.problem.label;
+    }
+
+    function renderEnergyChips() {
+      const chips = [];
+      const flow = textToChips(state.answers.flow, 3);
+      const energy = state.answers.energy || {};
+      const energizing = textToChips(energy.energizing, 3);
+      const draining = textToChips(energy.draining, 2);
+      const anchor = textToChips(state.answers.anchor, 2);
+      flow.forEach(item => chips.push({ label: `心流：${item}` }));
+      energizing.forEach(item => chips.push({ label: `回血：${item}` }));
+      draining.forEach(item => chips.push({ label: `抽干：${item}` }));
+      anchor.forEach(item => chips.push({ label: `锚点：${item}` }));
+
+      if (!chips.length) {
+        els.energyChips.innerHTML = '<span class="empty-state">心流、回血、抽干和锚点会在后半程浮出来。</span>';
+        return;
+      }
+
+      els.energyChips.innerHTML = chips.slice(0, 9).map(chip => `<span class="chip">${escapeHTML(chip.label)}</span>`).join("");
+    }
+
+    function renderForm(step) {
+      const disabled = state.mode === "feedback" ? "disabled" : "";
+      const answer = stepAnswer(step.id);
+
+      if (step.type === "dashboard") {
+        const values = state.answers.dashboard || initialState.answers.dashboard;
+        els.formArea.innerHTML = `
+          <div class="slider-grid">
+            ${dashboardItems.map(item => `
+              <div class="slider-box">
+                <label class="slider-label" for="${item.key}">
+                  <span>${escapeHTML(item.label)}</span>
+                  <span class="score-pill" id="${item.key}Score">${Number(values[item.key] ?? 5)}</span>
+                </label>
+                <input id="${item.key}" type="range" min="0" max="10" value="${Number(values[item.key] ?? 5)}" ${disabled}>
+                <div class="hint">${escapeHTML(item.detail)}</div>
+              </div>
+            `).join("")}
+          </div>
+          <div class="text-box">
+            <label class="field-label" for="dashboardNote">
+              <span>哪一项亮了红灯，为什么？</span>
+            </label>
+            <textarea id="dashboardNote" ${disabled} placeholder="写下一个最真实的观察，不需要解释得很体面。">${escapeHTML(values.note || "")}</textarea>
+          </div>
+        `;
+        dashboardItems.forEach(item => {
+          const input = document.getElementById(item.key);
+          const score = document.getElementById(`${item.key}Score`);
+          input.addEventListener("input", () => {
+            score.textContent = input.value;
+            state.answers.dashboard = state.answers.dashboard || {};
+            state.answers.dashboard[item.key] = Number(input.value);
+            renderGauges();
+            saveState(true);
+          });
+        });
+        document.getElementById("dashboardNote").addEventListener("input", event => {
+          state.answers.dashboard = state.answers.dashboard || {};
+          state.answers.dashboard.note = event.target.value;
+          saveState(true);
+        });
+        return;
+      }
+
+      if (step.type === "textarea") {
+        els.formArea.innerHTML = `
+          <div class="text-box">
+            <textarea id="textAnswer" ${disabled} placeholder="${escapeHTML(step.placeholder || "")}">${escapeHTML(answer || "")}</textarea>
+            <div class="hint">尽量写具体事实、场景和身体感受。设计从真实材料开始。</div>
+          </div>
+        `;
+        document.getElementById("textAnswer").addEventListener("input", event => {
+          state.answers[step.id] = event.target.value;
+          saveState(true);
+        });
+        return;
+      }
+
+      if (step.type === "choice") {
+        els.formArea.innerHTML = `
+          <div class="choice-list">
+            ${step.choices.map(choice => `
+              <button class="choice-option ${answer === choice.value ? "is-selected" : ""}" type="button" data-choice="${choice.value}" ${disabled}>
+                <span class="choice-title">${escapeHTML(choice.title)}</span>
+                <span class="choice-desc">${escapeHTML(choice.desc)}</span>
+              </button>
+            `).join("")}
+          </div>
+        `;
+        Array.from(els.formArea.querySelectorAll(".choice-option")).forEach(button => {
+          button.addEventListener("click", () => {
+            state.answers[step.id] = button.dataset.choice;
+            saveState(true);
+            render();
+          });
+        });
+        return;
+      }
+
+      if (step.type === "twoColumn") {
+        const values = answer || {};
+        els.formArea.innerHTML = `
+          <div class="two-columns">
+            ${step.columns.map(column => `
+              <div class="column-box">
+                <label class="field-label" for="${column.key}">
+                  <span>${escapeHTML(column.label)}</span>
+                </label>
+                <textarea id="${column.key}" ${disabled} placeholder="${escapeHTML(column.placeholder)}">${escapeHTML(values[column.key] || "")}</textarea>
+              </div>
+            `).join("")}
+          </div>
+        `;
+        step.columns.forEach(column => {
+          document.getElementById(column.key).addEventListener("input", event => {
+            state.answers[step.id] = state.answers[step.id] || {};
+            state.answers[step.id][column.key] = event.target.value;
+            renderEnergyChips();
+            saveState(true);
+          });
+        });
+        return;
+      }
+
+      if (step.type === "odyssey") {
+        const values = answer || defaultOdyssey();
+        els.formArea.innerHTML = `
+          <div class="odyssey-grid">
+            ${renderPlanForm("planA", "路线一", "正在走的路", "例如：继续深耕现在的职业，但重新设计节奏和边界。", values.planA, disabled)}
+            ${renderPlanForm("planB", "路线二", "第一条消失后", "例如：转向一个相邻领域，用现有能力换一种场景。", values.planB, disabled, "alt")}
+            ${renderPlanForm("planC", "路线三", "不考虑钱和眼光", "例如：把生活方式、创作和连接人放在中心。", values.planC, disabled, "free")}
+          </div>
+          <div class="text-box">
+            <label class="field-label"><span>你倾向先测试哪一条？</span></label>
+            <div class="pick-row">
+              ${["planA", "planB", "planC"].map((key, index) => `
+                <label class="radio-tile">
+                  <input type="radio" name="preferredPlan" value="${key}" ${values.preferred === key ? "checked" : ""} ${disabled}>
+                  <span>路线${["一", "二", "三"][index]}</span>
+                </label>
+              `).join("")}
+            </div>
+          </div>
+        `;
+        ["planA", "planB", "planC"].forEach(key => {
+          ["title", "work", "privateLife", "year5", "questions"].forEach(field => {
+            const node = document.getElementById(`${key}_${field}`);
+            node.addEventListener("input", event => {
+              state.answers.odyssey = state.answers.odyssey || defaultOdyssey();
+              state.answers.odyssey[key] = state.answers.odyssey[key] || {};
+              state.answers.odyssey[key][field] = event.target.value;
+              saveState(true);
+            });
+          });
+        });
+        Array.from(els.formArea.querySelectorAll('input[name="preferredPlan"]')).forEach(input => {
+          input.addEventListener("change", event => {
+            state.answers.odyssey = state.answers.odyssey || defaultOdyssey();
+            state.answers.odyssey.preferred = event.target.value;
+            saveState(true);
+          });
+        });
+      }
+    }
+
+    function renderPlanForm(key, tag, title, placeholder, value = {}, disabled = "", tagClass = "") {
+      return `
+        <div class="odyssey-plan">
+          <span class="plan-tag ${tagClass}">${escapeHTML(tag)} · ${escapeHTML(title)}</span>
+          <label class="field-label" for="${key}_title"><span>六字以内标题</span></label>
+          <input id="${key}_title" type="text" maxlength="12" ${disabled} value="${escapeHTML(value.title || "")}" placeholder="如：深耕生长">
+          <label class="field-label" for="${key}_work"><span>工作版本</span></label>
+          <textarea id="${key}_work" ${disabled} placeholder="${escapeHTML(placeholder)}">${escapeHTML(value.work || "")}</textarea>
+          <label class="field-label" for="${key}_privateLife"><span>私人生活版本</span></label>
+          <textarea id="${key}_privateLife" ${disabled} placeholder="关系、健康、居住、娱乐、创作、家庭节奏会是什么样？">${escapeHTML(value.privateLife || "")}</textarea>
+          <label class="field-label" for="${key}_year5"><span>五年后画面</span></label>
+          <textarea id="${key}_year5" ${disabled} placeholder="五年后的一个普通周二，你在哪里，和谁，怎么工作，晚上如何收尾？">${escapeHTML(value.year5 || "")}</textarea>
+          <label class="field-label" for="${key}_questions"><span>值得测试的问题</span></label>
+          <textarea id="${key}_questions" ${disabled} placeholder="这条路最需要验证的 2-3 个问题是什么？">${escapeHTML(value.questions || "")}</textarea>
+        </div>
+      `;
+    }
+
+    function renderFeedback(step) {
+      const feedback = state.feedback[step.id];
+      if (state.mode === "feedback" && feedback) {
+        els.feedbackBox.innerHTML = feedback;
+        els.feedbackBox.classList.add("is-visible");
+      } else {
+        els.feedbackBox.classList.remove("is-visible");
+        els.feedbackBox.textContent = "";
+      }
+    }
+
+    function submitCurrentStep() {
+      const step = currentStep();
+      if (state.mode === "feedback") {
+        moveNext();
+        return;
+      }
+
+      collectCurrentInput(step);
+      const validation = validateStep(step);
+      if (!validation.ok) {
+        showWarning(validation.message);
+        return;
+      }
+
+      if (step.id === "coreProblem") {
+        state.problem = classifyProblem(state.answers.coreProblem);
+      }
+
+      const feedback = makeFeedback(step);
+      state.feedback[step.id] = feedback;
+      markCompleted(step.id);
+      state.mode = "feedback";
+
+      if (step.id === "odyssey") {
+        state.reportGeneratedAt = new Date().toISOString();
+      }
+
+      render();
+    }
+
+    function collectCurrentInput(step) {
+      if (step.type === "dashboard") {
+        state.answers.dashboard = state.answers.dashboard || {};
+        dashboardItems.forEach(item => {
+          const node = document.getElementById(item.key);
+          if (node) state.answers.dashboard[item.key] = Number(node.value);
+        });
+        const note = document.getElementById("dashboardNote");
+        if (note) state.answers.dashboard.note = note.value.trim();
+      }
+      if (step.type === "textarea") {
+        const node = document.getElementById("textAnswer");
+        if (node) state.answers[step.id] = node.value.trim();
+      }
+      if (step.type === "twoColumn") {
+        state.answers[step.id] = state.answers[step.id] || {};
+        step.columns.forEach(column => {
+          const node = document.getElementById(column.key);
+          if (node) state.answers[step.id][column.key] = node.value.trim();
+        });
+      }
+      if (step.type === "odyssey") {
+        state.answers.odyssey = state.answers.odyssey || defaultOdyssey();
+        ["planA", "planB", "planC"].forEach(key => {
+          state.answers.odyssey[key] = state.answers.odyssey[key] || {};
+          ["title", "work", "privateLife", "year5", "questions"].forEach(field => {
+            const node = document.getElementById(`${key}_${field}`);
+            if (node) state.answers.odyssey[key][field] = node.value.trim();
+          });
+        });
+        const checked = document.querySelector('input[name="preferredPlan"]:checked');
+        if (checked) state.answers.odyssey.preferred = checked.value;
+      }
+    }
+
+    function validateStep(step) {
+      const answer = state.answers[step.id];
+      if (!step.required) return { ok: true };
+      if (step.type === "dashboard") {
+        const note = state.answers.dashboard?.note || "";
+        if (note.trim().length < 4) return { ok: false, message: "请写一句最亮红灯的观察。分数是仪表，原因才是设计材料。" };
+      }
+      if (step.type === "textarea") {
+        if (!answer || answer.trim().length < 12) return { ok: false, message: "再具体一点点。至少写出一个场景、一个感受，或一个你已经尝试过的动作。" };
+      }
+      if (step.type === "choice") {
+        if (!answer) return { ok: false, message: "选一个就好。愿意推演或今天跳过，都是对自己状态负责。" };
+      }
+      if (step.type === "twoColumn") {
+        if (!answer?.energizing || !answer?.draining) return { ok: false, message: "两边都写一点。我们要把“让我活过来”和“悄悄消耗我”分开看。" };
+      }
+      if (step.type === "odyssey") {
+        const odyssey = state.answers.odyssey || {};
+        const plans = ["planA", "planB", "planC"];
+        const missing = plans.some(key => {
+          const plan = odyssey[key] || {};
+          return !plan.title || !plan.work || !plan.privateLife || !plan.year5;
+        });
+        if (missing) return { ok: false, message: "三个版本都需要标题、工作版本、私人生活和五年后画面。数量本身含有质量，先把可能性逼出来。" };
+        if (!odyssey.preferred) return { ok: false, message: "请先选一条最想测试的路线。不是终身下注，只是下一轮原型。" };
+      }
+      return { ok: true };
+    }
+
+    function showWarning(message) {
+      els.warningBox.textContent = message;
+      els.warningBox.classList.add("is-visible");
+    }
+
+    function makeFeedback(step) {
+      if (step.id === "dashboard") {
+        const d = state.answers.dashboard;
+        const sorted = dashboardItems
+          .map(item => ({ ...item, score: Number(d[item.key] ?? 5) }))
+          .sort((a, b) => a.score - b.score);
+        const low = sorted[0];
+        const high = sorted[sorted.length - 1];
+        return `我先把你放回地图上：<strong>${low.label}</strong>现在最需要被照看，<strong>${high.label}</strong>暂时是你的支撑点。这里没有好坏评判，只有一个设计事实：如果红灯项长期被忽略，其他项迟早会替它付账。`;
+      }
+      if (step.id === "coreProblem") {
+        const p = state.problem || classifyProblem(state.answers.coreProblem);
+        if (p.gravity > p.designable) {
+          return `这里有明显的<strong>重力问题</strong>成分：有些现实不是靠你更努力就会改变。真正可设计的部分，是你在这些现实边界内如何重新定向、选择场景、降低试错成本。先把不能推动的墙认出来，不是认输，是节省生命。`;
+        }
+        return `这个问题里已经有不少<strong>可设计空间</strong>。下一步不是立刻找唯一答案，而是把它拆成可以试的小问题：你能找谁聊、能做什么小实验、能用什么证据判断它是否更靠近你。`;
+      }
+      if (step.id === "reverseConsent") {
+        return state.answers.reverseConsent === "yes"
+          ? `好，我们只看一眼代价，不把你留在那里。反向推演的价值，是把“继续这样也可以吧”的模糊感，变成一张清楚的账单。`
+          : `跳过是成熟的选择。人生设计不是逼自己硬扛情绪，而是根据当下能量选择合适的入口。我们把注意力转回正向的指南针。`;
+      }
+      if (step.id === "reverseTuesday") {
+        return `你刚刚写下的不是末日预言，而是一张<strong>惯性地图</strong>。最有价值的部分，是你已经看见了哪一种“不变”正在索取代价。接下来我们不沉在里面，而是把这股不适转成设计动力。`;
+      }
+      if (step.id === "workview") {
+        return `你对工作的描述里，藏着你愿意拿生命交换什么，也藏着你不想再被什么交换。先记住这一点：工作观不是职位偏好，它更像你和现实签订的关系协议。`;
+      }
+      if (step.id === "lifeview") {
+        return compassFeedback();
+      }
+      if (step.id === "flow") {
+        return `心流通常比“我应该喜欢什么”更诚实。你写下的这些时刻，是未来设计里的高价值材料：它们说明你在哪类任务、关系和环境里更容易变得专注、有力、像自己。`;
+      }
+      if (step.id === "energy") {
+        return `这里要小心一个陷阱：擅长不等于适合长期过日子。如果一个能力总是在证明你，却持续抽干你，它可能更像旧生存策略，而不是未来的正北方向。`;
+      }
+      if (step.id === "anchor") {
+        return `锚点最难松开，是因为它通常保护过你。我们不羞辱它，只把它重新定义：你真正想要的也许不是那个具体方案，而是它承诺过的安全、自由、被看见或掌控感。`;
+      }
+      if (step.id === "odyssey") {
+        return `三个版本已经成形。请记住：它们地位平等，都是 A 计划。你接下来选一个去试，不是在给人生判终身，而是在给现实发出一个可回收、可学习的探针。`;
+      }
+      return `收到。我们继续往下走。`;
+    }
+
+    function compassFeedback() {
+      const work = state.answers.workview || "";
+      const life = state.answers.lifeview || "";
+      const workTokens = extractMeaningTokens(work);
+      const lifeTokens = extractMeaningTokens(life);
+      const overlap = workTokens.filter(token => lifeTokens.includes(token));
+      if (overlap.length) {
+        return `你的工作观和人生观之间有一条相对一致的线：<strong>${escapeHTML(overlap.slice(0, 3).join("、"))}</strong>。这可能就是你的正北方向。后面做选择时，别只问“哪条路更厉害”，也问“哪条路更不背叛这条线”。`;
+      }
+      return `我先温和地点一下：你的工作观和人生观目前像两套语言。一个在谈现实交换，一个在谈生命意义。冲突不代表错，但如果长期不让它们谈判，人会在白天和夜晚分别过两种人生。`;
+    }
+
+    function moveNext() {
+      const list = availableSteps();
+      const index = currentStepIndex();
+      if (currentStep().id === "odyssey" && isCompleted("odyssey")) {
+        showReport();
+        return;
+      }
+      const next = list[index + 1];
+      if (next) {
+        state.currentStepId = next.id;
+        state.mode = "input";
+      } else {
+        showReport();
+        return;
+      }
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function moveBack() {
+      const list = availableSteps();
+      const index = currentStepIndex();
+      if (index > 0 && state.mode !== "feedback") {
+        state.currentStepId = list[index - 1].id;
+        state.mode = "input";
+        render();
+      }
+    }
+
+    function skipCurrent() {
+      const step = currentStep();
+      if (step.required) return;
+      markCompleted(step.id);
+      moveNext();
+    }
+
+    function allRequiredDone() {
+      return availableSteps().every(step => !step.required || isCompleted(step.id));
+    }
+
+    function showReport() {
+      collectCurrentInput(currentStep());
+      state.reportGeneratedAt = new Date().toISOString();
+      const html = generateReport();
+      els.reportContent.innerHTML = html;
+      els.reportMeta.textContent = `生成时间：${formatDateTime(state.reportGeneratedAt)}。这是一版可修改的蓝图，不是终身判决。`;
+      els.questionView.style.display = "none";
+      els.reportView.classList.add("is-visible");
+      renderPhases();
+      saveState(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function returnToQuestions() {
+      els.questionView.style.display = "block";
+      els.reportView.classList.remove("is-visible");
+      render();
+    }
+
+    function generateReport() {
+      const a = state.answers;
+      const d = a.dashboard || {};
+      const problem = state.problem || classifyProblem(a.coreProblem || "");
+      const odyssey = a.odyssey || defaultOdyssey();
+      const preferred = odyssey.preferred || "planA";
+      const preferredPlan = odyssey[preferred] || {};
+      const scores = dashboardItems.map(item => ({ ...item, score: Number(d[item.key] ?? 5) }));
+      const sorted = [...scores].sort((x, y) => x.score - y.score);
+      const low = sorted[0];
+      const high = sorted[sorted.length - 1];
+      const workLifeOverlap = extractMeaningTokens(a.workview || "").filter(token => extractMeaningTokens(a.lifeview || "").includes(token));
+      const gravityLine = problem.gravity > problem.designable
+        ? "你的困扰里重力成分更重：有些现实不是靠意志、勤奋或自责就能推动。真正的设计动作，是承认边界以后，把问题改写成你能行动、能采访、能原型验证的版本。"
+        : "你的困扰里已经有明显的可设计成分：它不是一道等你想通才开始的题，而是一组可以拆小、可以试做、可以用真实反馈修正的行动假设。";
+
+      return `
+        <h2>你在这里</h2>
+        <p>这份蓝图从四个仪表盘开始，不是为了给你贴标签，而是为了看见你现在站在哪里。你的健康是 <strong>${scoreText(d.health)}</strong>，工作是 <strong>${scoreText(d.work)}</strong>，娱乐是 <strong>${scoreText(d.play)}</strong>，爱是 <strong>${scoreText(d.love)}</strong>。最低的一项是 <strong>${escapeHTML(low.label)}</strong>，最高的一项是 <strong>${escapeHTML(high.label)}</strong>。</p>
+        <p>最低项不是你的失败，它更像仪表盘上的红灯。红灯的意义不是羞辱驾驶员，而是提醒系统里有一块已经不能再靠忍耐维持。你写下的观察是：</p>
+        <div class="quote">${formatText(d.note || "暂未填写。")}</div>
+        <p>如果有人不听你怎么解释，只看你的行为，他可能会判断：你一边想要改变，一边也在保护某种安全感。这个保护不丢人，它过去也许救过你；但如果它开始让你错过生命，就值得被重新设计。</p>
+
+        <h2>真问题</h2>
+        <p>你一开始带来的问题是：</p>
+        <div class="quote">${formatText(a.coreProblem || "暂未填写。")}</div>
+        <p>${gravityLine}</p>
+        <p><strong>思维误区：</strong>把所有痛苦都当成“我必须解决掉的问题”。这会让你去和时代、行业、他人评价、既成事实硬碰硬，最后精疲力尽。</p>
+        <p><strong>重新定义：</strong>把不可改变的部分命名为重力，把可行动的部分改写成设计题。例如，不是“怎样让所有人认可我”，而是“我如何找到更重视我这类能力的场景，并用低成本原型验证它是否适合我”。</p>
+        <p>目前雷达判断：重力成分约 <strong>${problem.gravity}%</strong>，可设计成分约 <strong>${problem.designable}%</strong>。这不是精密测量，而是提醒你：接下来不要把力气平均撒在所有痛点上，要把力气放到能产生信息的行动上。</p>
+        ${a.reverseTuesday ? `<h3>反向推演</h3><p>你看见了如果五年不变，普通周二可能变成这样：</p><div class="quote">${formatText(a.reverseTuesday)}</div><p>这段推演的价值，不在于制造恐惧，而在于让惯性变得可见。看见代价以后，人才更容易从“以后再说”回到“本周试一点”。</p>` : ""}
+
+        <h2>你的指南针</h2>
+        <p>你的工作观是：</p>
+        <div class="quote">${formatText(a.workview || "暂未填写。")}</div>
+        <p>你的人生观是：</p>
+        <div class="quote">${formatText(a.lifeview || "暂未填写。")}</div>
+        <p>${workLifeOverlap.length ? `两者之间已经有一些共同词：<strong>${escapeHTML(workLifeOverlap.slice(0, 5).join("、"))}</strong>。这些词很可能不是装饰，而是你的正北方向。` : "这两段话目前并不完全说同一种语言。工作观更像现实交换，人生观更像意义归属。你不需要马上让它们一致，但未来做选择时，必须允许它们坐到同一张桌子上。"} 正北方向不是某个具体职位，而是一套判断：什么值得你长期投入，什么会让你一边赢、一边失去自己。</p>
+
+        <h2>你的能量地图</h2>
+        <p>你的心流线索是：</p>
+        <div class="quote">${formatText(a.flow || "暂未填写。")}</div>
+        <p>让你回血的事：</p>
+        <div class="quote">${formatText(a.energy?.energizing || "暂未填写。")}</div>
+        <p>会抽干你的事：</p>
+        <div class="quote">${formatText(a.energy?.draining || "暂未填写。")}</div>
+        <p>未来的设计应该偏向那些让你专注、产生连接、看到真实反馈、做完以后更有生命力的活动；同时减少那些只是在证明你、维持体面、重复消耗情绪的任务。你可以擅长一件事，但不必把余生交给它。</p>
+
+        <h2>锚点</h2>
+        <p>你写下的执念是：</p>
+        <div class="quote">${formatText(a.anchor || "暂未填写。")}</div>
+        <p>锚点背后通常不是愚蠢，而是一种被保护过的需要：安全、自由、掌控、认可、归属或尊严。真正的设计不是粗暴砍掉它，而是问：除了这个已经行不通的方案，还有没有别的方式，能满足同一个深层需要。</p>
+
+        <h2>三个奥德赛计划</h2>
+        ${["planA", "planB", "planC"].map((key, index) => renderPlanReport(odyssey[key], index, preferred === key)).join("")}
+
+        <h2>先测试的一条路</h2>
+        <p>你目前倾向先测试：<strong>${escapeHTML(preferredPlan.title || planName(preferred))}</strong>。这不是终身下注，只是下一轮原型。</p>
+        <p><strong>反愿景：</strong>如果这条路完全不试，你可能会继续围着旧问题打转，把越来越多的时间花在解释、等待和自我说服上。</p>
+        <p><strong>愿景：</strong>${escapeHTML(preferredPlan.year5 || "这条路通向一个更有选择权、更能使用你的能量、更不需要靠长期忍耐维持体面的生活版本。")}</p>
+        <p><strong>本季度核心问题：</strong>这条路线是否真的能让你在现实约束内获得更多能量、更多选择权和更一致的生活感？</p>
+        <p><strong>一个月内的小东西：</strong>做出一个可展示的最小作品、一次真实访谈记录、一次短期体验复盘，或一份三页以内的路线验证说明。它不需要完美，只需要能带来反馈。</p>
+        <p><strong>每天推动它的小事：</strong>每天留 20 到 40 分钟做一件能产生证据的动作：联系一个人、记录一次能量、写半页观察、推进一个小作品、复盘一次真实反馈。</p>
+        <p><strong>不愿牺牲的底线：</strong>不要为了证明这条路正确而牺牲基本健康、关键关系和必要现金流。原型的目的不是把自己逼到悬崖边，而是用较低成本换取高质量信息。</p>
+
+        <h2>原型行动清单</h2>
+        <ul>
+          <li><strong>人生设计采访：</strong>找三类人聊，每类至少一位。第一类是已经在你路线一附近生活的人；第二类是走过相邻路线、但生活方式明显不同的人；第三类是让你羡慕其生活状态而不只是头衔的人。访谈时不要要工作，也不要请求对方评价你，只问他真实的一天、代价、误判、收入结构、能量消耗和转折点。</li>
+          <li><strong>一天原型：</strong>安排一个完整半天模拟目标路线里的普通工作节奏。用真实任务，不用想象。结束后记录身体感受、注意力、抗拒点和兴奋点。</li>
+          <li><strong>一周原型：</strong>连续七天做同一个微动作，例如每天输出一个小片段、联系一个相关人、阅读并复述一个案例、或把当前工作里的一个任务改造成你理想方式的缩小版。</li>
+          <li><strong>本周第一小步：</strong>今天就列出 10 个可采访对象，发出其中 2 条邀约。邀约文案只需要说：我在做一轮人生设计原型，想听听你真实的经历和日常，不是找工作。</li>
+          <li><strong>随身练习：</strong>在手机上设 3 到 4 个随机提醒，提醒语写：“此刻我是在走向我厌恶的生活，还是我想要的生活？”当提醒响起，只记录当下场景、身体感受和你正在维护什么惯性。</li>
+        </ul>
+
+        <h2>失败免疫</h2>
+        <p>人生是一场无限游戏，不是一次性押中的考试。三个版本都可以先试再调，谁都不是一锤定音的赌注。原型即使失败，也会留下信息：你会更清楚自己不想要什么、什么约束是真的、什么恐惧只是旧经验的回声。你不需要等到完全确信才开始。你只需要选一个小得足够开始、真得足够有信息量的动作，先让现实回答你。</p>
+      `;
+    }
+
+    function renderPlanReport(plan = {}, index, preferred) {
+      const labels = ["路线一", "路线二", "路线三"];
+      const defaults = ["正在走的路", "消失后的路", "自由想象的路"];
+      const assessments = assessPlan(plan, index);
+      return `
+        <h3>${escapeHTML(labels[index])}：${escapeHTML(plan.title || defaults[index])}${preferred ? "（先测试）" : ""}</h3>
+        <p><strong>工作线：</strong>${formatInline(plan.work || "暂未填写。")}</p>
+        <p><strong>私人生活线：</strong>${formatInline(plan.privateLife || "暂未填写。")}</p>
+        <p><strong>五年后画面：</strong>${formatInline(plan.year5 || "暂未填写。")}</p>
+        <p><strong>值得测试的问题：</strong>${formatInline(plan.questions || "这条路线是否能提供足够能量、现实支撑和身份一致性？")}</p>
+        <p><strong>四项评估：</strong>物力 ${assessments.resources}；喜欢程度 ${assessments.liking}；自信心 ${assessments.confidence}；一致性 ${assessments.alignment}。</p>
+      `;
+    }
+
+    function assessPlan(plan = {}, index) {
+      const text = `${plan.work || ""} ${plan.privateLife || ""} ${plan.year5 || ""} ${plan.questions || ""}`;
+      const length = text.length;
+      const practical = /收入|现金|资源|人脉|时间|公司|客户|项目|学习|证书|作品|副业|试/.test(text);
+      const relational = /家人|伴侣|朋友|孩子|关系|团队|社群|连接|陪伴/.test(text);
+      const freedom = /自由|创作|旅行|独立|不考虑钱|喜欢|热爱|表达/.test(text);
+      return {
+        resources: practical || index === 0 ? "中高" : length > 80 ? "中" : "待验证",
+        liking: freedom || length > 120 ? "高" : "中",
+        confidence: index === 0 ? "中高" : practical ? "中" : "待建立",
+        alignment: relational || freedom || length > 120 ? "中高" : "待验证"
+      };
+    }
+
+    function classifyProblem(text = "") {
+      const gravityTerms = ["别人", "社会", "时代", "行业", "政策", "房价", "年龄", "学历", "家庭出身", "父母", "老板", "公司", "歧视", "不公平", "大环境", "经济", "市场", "无法", "不能改变", "没办法"];
+      const designTerms = ["我如何", "怎么", "尝试", "选择", "行动", "学习", "联系", "测试", "改变", "计划", "作品", "面试", "转型", "沟通", "边界", "时间", "原型"];
+      const gravityHits = countHits(text, gravityTerms);
+      const designHits = countHits(text, designTerms);
+      let gravity = clamp(35 + gravityHits * 11 - designHits * 5, 15, 85);
+      let designable = clamp(100 - gravity + designHits * 6, 20, 85);
+      const total = gravity + designable;
+      gravity = Math.round((gravity / total) * 100);
+      designable = 100 - gravity;
+      const label = gravity > designable
+        ? "现实边界很强，先停止和墙拔河，再重定向。"
+        : "行动空间已经露出来了，下一步适合做原型。";
+      return { gravity, designable, label };
+    }
+
+    function countHits(text, terms) {
+      return terms.reduce((sum, term) => sum + (text.includes(term) ? 1 : 0), 0);
+    }
+
+    function extractMeaningTokens(text) {
+      const dictionary = ["自由", "安全", "创造", "创作", "连接", "关系", "成长", "学习", "价值", "影响", "帮助", "家庭", "健康", "稳定", "金钱", "尊严", "掌控", "探索", "真实", "作品", "世界", "他人", "陪伴", "表达", "专业", "长期"];
+      return dictionary.filter(word => text.includes(word));
+    }
+
+    function textToChips(text = "", limit = 3) {
+      return String(text)
+        .split(/[，。；;、\n]/)
+        .map(item => item.trim())
+        .filter(Boolean)
+        .map(item => item.length > 16 ? `${item.slice(0, 16)}…` : item)
+        .slice(0, limit);
+    }
+
+    function defaultOdyssey() {
+      return {
+        planA: { title: "", work: "", privateLife: "", year5: "", questions: "" },
+        planB: { title: "", work: "", privateLife: "", year5: "", questions: "" },
+        planC: { title: "", work: "", privateLife: "", year5: "", questions: "" },
+        preferred: ""
+      };
+    }
+
+    function scoreText(value) {
+      const score = Number(value ?? 5);
+      const label = score <= 3 ? "红灯" : score <= 6 ? "需要照看" : "相对有支撑";
+      return `${score}/10（${label}）`;
+    }
+
+    function planName(key) {
+      return { planA: "路线一", planB: "路线二", planC: "路线三" }[key] || "某条路线";
+    }
+
+    function formatText(text) {
+      return escapeHTML(text).replace(/\n/g, "<br>");
+    }
+
+    function formatInline(text) {
+      return escapeHTML(text).replace(/\n/g, "；");
+    }
+
+    function formatDateTime(iso) {
+      if (!iso) return "尚未生成";
+      const date = new Date(iso);
+      return date.toLocaleString("zh-CN", { hour12: false });
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function escapeHTML(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function showToast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("is-visible");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => {
+        els.toast.classList.remove("is-visible");
+      }, 1800);
+    }
+
+    function copyReport() {
+      const text = els.reportContent.innerText.trim();
+      if (!text) {
+        showToast("还没有可复制的蓝图");
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).then(() => showToast("蓝图已复制"));
+        return;
+      }
+      const area = document.createElement("textarea");
+      area.value = text;
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+      showToast("蓝图已复制");
+    }
+
+    function downloadReport() {
+      const text = els.reportContent.innerText.trim() || generateReport().replace(/<[^>]+>/g, "");
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "个人人生设计蓝图.txt";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast("已生成下载文件");
+    }
+
+    function resetAll() {
+      if (!confirm("确定要清空当前回答并重新开始吗？")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      state = structuredClone(initialState);
+      render();
+      showToast("已重新开始");
+    }
+
+    els.mainButton.addEventListener("click", submitCurrentStep);
+    els.backButton.addEventListener("click", moveBack);
+    els.skipButton.addEventListener("click", skipCurrent);
+    els.saveButton.addEventListener("click", () => saveState(false));
+    els.resetButton.addEventListener("click", resetAll);
+    els.jumpReportButton.addEventListener("click", showReport);
+    els.returnButton.addEventListener("click", returnToQuestions);
+    els.copyButton.addEventListener("click", copyReport);
+    els.downloadButton.addEventListener("click", downloadReport);
+
+    render();
+  </script>
+</body>
+</html>
