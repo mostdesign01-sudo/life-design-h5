@@ -121,40 +121,49 @@ const player = {
 };
 const camForward = player.facing.clone();
 
-// Camera state: smoothed position/look/up chasing a per-mode target.
+// Orthographic camera state: a viewing direction, a look-at point and how many world units fit
+// vertically on screen, each smoothed toward a per-mode target.
+const CAM_DISTANCE = 60;
 const cam = {
   mode: "intro",
-  pos: new THREE.Vector3(),
+  dir: new THREE.Vector3(),
   look: new THREE.Vector3(),
   up: new THREE.Vector3(0, 1, 0),
+  view: 18,
   zoom: 1,
   focusId: null,
   offset: 0
 };
-// Intro: a low side view so the planet floats over the cloud sea at dusk.
+// Intro and overview: an isometric-style view of the whole planet.
 const orbit = {
   yaw: Math.atan2(POLE.x, POLE.z) - 0.5,
-  pitch: 0.3,
-  dist: 22
+  pitch: 0.5,
+  scale: 1
 };
 
-// Portrait screens have a narrow horizontal field of view, so pull the camera back.
-function portraitScale(strength) {
-  const aspect = window.innerWidth / window.innerHeight;
-  return aspect < 1 ? 1 + (1 - aspect) * strength : 1;
-}
-
-function orbitPosition(out) {
+function orbitDirection(out) {
   return out.set(
     Math.cos(orbit.pitch) * Math.sin(orbit.yaw),
     Math.sin(orbit.pitch),
     Math.cos(orbit.pitch) * Math.cos(orbit.yaw)
-  ).multiplyScalar(orbit.dist * portraitScale(1.1));
+  );
 }
 
-orbitPosition(cam.pos);
-camera.position.copy(cam.pos);
-camera.lookAt(0, 0, 0);
+// Fit `height` world units vertically, but never fewer than `minWidth` across on narrow screens.
+function viewHeightFor(height, minWidth) {
+  const aspect = window.innerWidth / window.innerHeight;
+  return Math.max(height, minWidth / aspect);
+}
+
+function applyView(cameraToSet, height, aspect) {
+  cameraToSet.left = (-height * aspect) / 2;
+  cameraToSet.right = (height * aspect) / 2;
+  cameraToSet.top = height / 2;
+  cameraToSet.bottom = -height / 2;
+  cameraToSet.updateProjectionMatrix();
+}
+
+orbitDirection(cam.dir);
 
 const input = { x: 0, y: 0, keys: new Set() };
 let autoTarget = null;
@@ -624,16 +633,13 @@ function makePostcard() {
   const size = 1080;
   const shotCam = camera.clone();
   shotCam.clearViewOffset();
-  // Same low side view as the intro: the planet floating over the clouds, with room for the title.
+  // Same isometric view as the intro, with the planet sitting a little low to leave room for the title.
   const yaw = Math.atan2(POLE.x, POLE.z) - 0.5;
   const pitch = 0.5;
-  shotCam.position.set(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)).multiplyScalar(21);
+  shotCam.position.set(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)).multiplyScalar(CAM_DISTANCE);
   shotCam.up.set(0, 1, 0);
-  shotCam.aspect = 1;
-  shotCam.fov = 50;
   shotCam.lookAt(0, 1.6, 0);
-  shotCam.updateProjectionMatrix();
-  world.sky.position.copy(shotCam.position);
+  applyView(shotCam, 17.5, 1);
 
   const shot = world.snapshot(shotCam, size);
   const card = document.createElement("canvas");
@@ -703,7 +709,7 @@ function setOverview() {
   autoTarget = null;
   const p = player.dir.clone().add(SUN.clone().multiplyScalar(0.2)).normalize();
   orbit.yaw = Math.atan2(p.x, p.z);
-  orbit.pitch = THREE.MathUtils.clamp(Math.asin(p.y), 0.25, 0.8);
+  orbit.pitch = THREE.MathUtils.clamp(Math.asin(p.y), 0.35, 0.8);
   els.overviewBtn.textContent = "回到地面";
 }
 
@@ -718,16 +724,19 @@ els.startBtn.addEventListener("click", () => {
   setTimeout(() => { els.hint.style.opacity = "0"; }, 7000);
 });
 
-const desired = { pos: new THREE.Vector3(), look: new THREE.Vector3(), up: new THREE.Vector3() };
+const desired = { dir: new THREE.Vector3(), look: new THREE.Vector3(), up: new THREE.Vector3(), view: 18 };
+// Camera elevation above the ground plane: the classic isometric angle, a little steeper.
+const ELEVATION = THREE.MathUtils.degToRad(38);
 
 function updateCamera(dt, time) {
   const up = player.dir;
   const base = tmpV.copy(up).multiplyScalar(surfaceRadius(up));
   if (cam.mode === "intro" || cam.mode === "overview") {
     if (cam.mode === "intro") orbit.yaw += dt * 0.05;
-    orbitPosition(desired.pos);
-    desired.look.set(0, cam.mode === "intro" ? -1.2 : 0, 0);
+    orbitDirection(desired.dir);
+    desired.look.set(0, cam.mode === "intro" ? -1.6 : 0, 0);
     desired.up.set(0, 1, 0);
+    desired.view = viewHeightFor(17 * orbit.scale, 15 * orbit.scale);
   } else if (cam.mode === "focus" && objects[cam.focusId]) {
     const obj = objects[cam.focusId];
     const od = obj.dir;
@@ -743,26 +752,25 @@ function updateCamera(dt, time) {
       // Look from the far side, slightly off-axis, so the traveler stands facing the object in frame.
       away.applyAxisAngle(od, 2.4);
     }
-    const f = obj.focus * portraitScale(0.9);
-    desired.pos.copy(objPos).addScaledVector(od, 2.2 * f).addScaledVector(away, 4.4 * f);
-    desired.look.copy(objPos).addScaledVector(od, 0.45 * obj.focus);
+    desired.dir.copy(od).multiplyScalar(Math.sin(ELEVATION)).addScaledVector(away, Math.cos(ELEVATION));
+    desired.look.copy(objPos).addScaledVector(od, 0.5 * obj.focus);
     desired.up.copy(od);
+    desired.view = viewHeightFor(3.6 * obj.focus, 3.4 * obj.focus);
   } else {
-    const z = cam.zoom * portraitScale(0.3);
-    desired.pos.copy(base).addScaledVector(up, 2.3 * z).addScaledVector(camForward, -4.4 * z);
-    desired.look.copy(base).addScaledVector(up, 0.7).addScaledVector(camForward, 1.2);
+    desired.dir.copy(up).multiplyScalar(Math.sin(ELEVATION)).addScaledVector(camForward, -Math.cos(ELEVATION));
+    desired.look.copy(base).addScaledVector(up, 0.5).addScaledVector(camForward, 0.6);
     desired.up.copy(up);
+    desired.view = viewHeightFor(6.5 * cam.zoom, 4.2 * cam.zoom);
   }
   const k = 1 - Math.exp(-dt * (cam.mode === "follow" ? 7 : 3));
-  cam.pos.lerp(desired.pos, k);
+  cam.dir.lerp(desired.dir, k).normalize();
   cam.look.lerp(desired.look, k);
   cam.up.lerp(desired.up, k).normalize();
-  // Keep the camera outside the planet while it travels between modes.
-  const minR = R + 0.6;
-  if (cam.pos.length() < minR) cam.pos.setLength(minR);
-  camera.position.copy(cam.pos);
+  cam.view += (desired.view - cam.view) * k;
+  camera.position.copy(cam.look).addScaledVector(cam.dir, CAM_DISTANCE);
   camera.up.copy(cam.up);
   camera.lookAt(cam.look);
+  applyView(camera, cam.view, window.innerWidth / window.innerHeight);
   // While a sheet is open, shift the projection so the scene centres in the space above it.
   const sheetH = sheetState ? els.sheet.offsetHeight : 0;
   cam.offset += (sheetH * 0.5 - cam.offset) * (1 - Math.exp(-dt * 6));
@@ -773,7 +781,6 @@ function updateCamera(dt, time) {
   } else if (camera.view?.enabled) {
     camera.clearViewOffset();
   }
-  world.sky.position.copy(camera.position);
 }
 
 // ---------- player ----------
@@ -1003,7 +1010,7 @@ els.canvas.addEventListener("pointerdown", event => {
   const touches = [...pointers.entries()].filter(([id]) => id !== joystickId);
   if (touches.length === 2) {
     const [a, b] = touches.map(([, value]) => value);
-    pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: cam.zoom, orbitDist: orbit.dist };
+    pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: cam.zoom, orbitScale: orbit.scale };
   }
 });
 
@@ -1034,13 +1041,13 @@ els.canvas.addEventListener("pointermove", event => {
     const [a, b] = others.map(([, value]) => value);
     const ratio = pinchStart.dist / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y));
     cam.zoom = THREE.MathUtils.clamp(pinchStart.zoom * ratio, 0.6, 1.8);
-    orbit.dist = THREE.MathUtils.clamp(pinchStart.orbitDist * ratio, 12, 34);
+    orbit.scale = THREE.MathUtils.clamp(pinchStart.orbitScale * ratio, 0.6, 1.5);
     return;
   }
   if (sheetState) return;
   rotateView(dx * 0.006);
   if (cam.mode === "overview" || cam.mode === "intro") {
-    orbit.pitch = THREE.MathUtils.clamp(orbit.pitch + dy * 0.004, -0.2, 1.3);
+    orbit.pitch = THREE.MathUtils.clamp(orbit.pitch + dy * 0.004, 0.05, 1.3);
   }
 });
 
@@ -1067,7 +1074,7 @@ els.canvas.addEventListener("wheel", event => {
   event.preventDefault();
   const f = Math.exp(event.deltaY * 0.001);
   cam.zoom = THREE.MathUtils.clamp(cam.zoom * f, 0.6, 1.8);
-  orbit.dist = THREE.MathUtils.clamp(orbit.dist * f, 12, 34);
+  orbit.scale = THREE.MathUtils.clamp(orbit.scale * f, 0.6, 1.5);
 }, { passive: false });
 
 window.addEventListener("keydown", event => {
@@ -1094,8 +1101,6 @@ function resize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
   world.setSize(w, h);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
 }
 
 window.addEventListener("resize", resize);
@@ -1107,15 +1112,6 @@ renderQuests();
 
 const clock = new THREE.Clock();
 let started = false;
-const focusPoint = new THREE.Vector3();
-
-// Keep the tilt-shift band on whatever the camera is about: the traveler, the open object, or the planet.
-function updateFocus() {
-  if (cam.mode === "focus" && objects[cam.focusId]) focusPoint.copy(objects[cam.focusId].dir).multiplyScalar(R + 0.4);
-  else if (cam.mode === "follow") focusPoint.copy(traveler.group.position).addScaledVector(player.dir, 0.5);
-  else focusPoint.set(0, 0, 0);
-  world.setFocus(THREE.MathUtils.clamp(focusPoint.project(camera).y * 0.5 + 0.5, 0.1, 0.9));
-}
 
 // Measure the frame rate for a few seconds and step effects down on slower phones.
 // `?quality=0|1|2` in the URL pins a level instead.
@@ -1142,8 +1138,7 @@ function frame() {
   world.update(dt, time);
   updatePlayer(dt, time);
   updateCamera(dt, time);
-  updateFocus();
-  world.render(camera, time);
+  world.render(camera);
   updateLabels();
   if (!started) {
     started = true;
