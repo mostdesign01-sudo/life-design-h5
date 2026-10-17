@@ -45,7 +45,9 @@
 
 操作：手机左侧拖动移动、右侧拖动转视角、双指缩放；电脑 WASD 移动、拖动鼠标转视角、滚轮缩放、Enter 查看。点任意物件，角色会自己走过去。
 
-技术上是纯静态的 Three.js（`vendor/three.module.min.js`，r160，MIT），无构建、不依赖 CDN，所有模型都是代码生成的占位造型，之后可以换成 Tripo 等工具生成的 GLB。代码在 [`planet/`](planet/)：`world.js` 搭场景，`main.js` 管操作和对话，`state.js` 负责和问卷共用进度。
+技术上是纯静态的 Three.js（`vendor/three.module.min.js` 及 `vendor/three-addons/` 里的后期处理模块，r160，MIT），无构建、不依赖 CDN。画面是吉卜力式的暖光风格：天空环境光、柔和阴影、随风摆动的草、树木与积云，再叠加泛光、移轴景深和调色。所有模型都是代码生成的，之后可以换成 Tripo 等工具生成的 GLB。代码在 [`planet/`](planet/)：`world.js` 搭场景，`look.js` 负责后期与手绘贴图，`main.js` 管操作和对话，`state.js` 负责和问卷共用进度。
+
+页面会在开场几秒测帧率，较慢的手机自动关掉移轴和泛光、降低分辨率。也可以在地址后加 `?quality=0`、`1` 或 `2` 手动指定画质。
 
 ## 记录与隐私
 

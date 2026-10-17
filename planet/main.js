@@ -1,4 +1,4 @@
-import * as THREE from "../vendor/three.module.min.js";
+import * as THREE from "three";
 import { createWorld, buildTraveler, surfaceRadius, POLE, SUN, R } from "./world.js";
 import {
   loadLifeState, saveLifeState, loadPlanetState, savePlanetState,
@@ -94,7 +94,7 @@ let life = loadLifeState();
 const planet = loadPlanetState();
 
 const world = createWorld(els.canvas);
-const { renderer, scene, camera, objects, farPlanets } = world;
+const { scene, camera, objects, farPlanets } = world;
 const traveler = buildTraveler();
 scene.add(traveler.group);
 
@@ -252,8 +252,19 @@ function escapeHTML(value) {
 
 // ---------- sheet ----------
 
+// For objects framed from the front, where the traveler should stand so it doesn't block the view.
+function standSpot(obj) {
+  if (!obj?.front) return null;
+  const side = new THREE.Vector3().crossVectors(obj.dir, obj.front).normalize();
+  const t = obj.front.clone().multiplyScalar(0.45).add(side).normalize();
+  return obj.dir.clone().multiplyScalar(Math.cos(obj.reach)).addScaledVector(t, Math.sin(obj.reach)).normalize();
+}
+
 function openSheet(state, html) {
   sheetState = state;
+  player.standTarget = standSpot(objects[state.focusId]);
+  player.standTime = 2.5;
+  player.lookTarget = objects[state.focusId]?.dir || null;
   els.sheetBody.innerHTML = html;
   els.sheet.classList.add("is-open");
   els.sheetBackdrop.classList.add("is-open");
@@ -611,8 +622,6 @@ function goTo(id) {
 
 function makePostcard() {
   const size = 1080;
-  const prevRatio = renderer.getPixelRatio();
-  const prevSize = renderer.getSize(new THREE.Vector2());
   const shotCam = camera.clone();
   shotCam.clearViewOffset();
   // Same low side view as the intro: the planet floating over the clouds, with room for the title.
@@ -626,16 +635,12 @@ function makePostcard() {
   shotCam.updateProjectionMatrix();
   world.sky.position.copy(shotCam.position);
 
-  renderer.setPixelRatio(1);
-  renderer.setSize(size, size, false);
-  renderer.render(scene, shotCam);
+  const shot = world.snapshot(shotCam, size);
   const card = document.createElement("canvas");
   card.width = size;
   card.height = 1480;
   const ctx = card.getContext("2d");
-  ctx.drawImage(renderer.domElement, 0, 0, size, size);
-  renderer.setPixelRatio(prevRatio);
-  renderer.setSize(prevSize.x, prevSize.y, false);
+  ctx.drawImage(shot, 0, 0, size, size);
 
   const font = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const shade = ctx.createLinearGradient(0, 0, 0, 260);
@@ -729,7 +734,9 @@ function updateCamera(dt, time) {
     const objPos = od.clone().multiplyScalar(R);
     let away;
     if (obj.front) {
-      away = obj.front.clone().applyAxisAngle(od, 0.8);
+      // The traveler steps to one side (see standSpot); the camera swings to the other.
+      const side = new THREE.Vector3().crossVectors(od, obj.front).normalize();
+      away = obj.front.clone().multiplyScalar(Math.cos(0.75)).addScaledVector(side, -Math.sin(0.75)).normalize();
     } else {
       away = tangentToward(od, player.dir);
       if (away.lengthSq() < 0.5) away.copy(camForward).negate();
@@ -816,6 +823,15 @@ function updatePlayer(dt, time) {
     right.crossVectors(camForward, player.dir);
     moveDir.copy(right).multiplyScalar(ix).addScaledVector(camForward, iy).normalize();
     speed = 2.6 * mag;
+  } else if (sheetState && player.standTarget) {
+    // Step aside while a sheet is open, then turn to face the object.
+    player.standTime -= dt;
+    if (player.dir.angleTo(player.standTarget) > 0.01 && player.standTime > 0) {
+      tangentToward(player.dir, player.standTarget, moveDir);
+      speed = 1.6;
+    } else {
+      player.standTarget = null;
+    }
   } else if (canMove && autoTarget) {
     const obj = objects[autoTarget];
     tangentToward(player.dir, obj.dir, moveDir);
@@ -832,9 +848,15 @@ function updatePlayer(dt, time) {
     }
   }
 
+  if (sheetState && !player.standTarget && player.lookTarget) {
+    const face = tangentToward(player.dir, player.lookTarget);
+    if (face.lengthSq() > 0.5) player.facing.lerp(face, 1 - Math.exp(-dt * 6));
+    reproject(player.facing, player.dir);
+  }
+
   if (speed > 0) {
     const before = player.dir.clone();
-    movePlayer(moveDir, speed * dt);
+    movePlayer(moveDir, Math.min(speed * dt, player.standTarget ? player.dir.angleTo(player.standTarget) * R : Infinity));
     // Sliding along a blocker: walk in the direction actually travelled.
     const travelled = tangentToward(before, player.dir);
     if (travelled.lengthSq() > 0.5) player.facing.lerp(travelled, 1 - Math.exp(-dt * 12));
@@ -850,7 +872,11 @@ function updatePlayer(dt, time) {
   traveler.group.position.copy(up).multiplyScalar(surfaceRadius(up) - 0.01);
 
   const s = Math.min(1, player.speed / 2.6);
+  const prevStep = Math.sin(player.phase);
   player.phase += dt * (3 + player.speed * 3.2);
+  if (s > 0.4 && Math.sign(prevStep) !== Math.sign(Math.sin(player.phase))) {
+    world.kickDust(traveler.group.position, player.dir);
+  }
   const swing = Math.sin(player.phase) * 0.75 * s;
   traveler.legs[0].rotation.x = swing;
   traveler.legs[1].rotation.x = -swing;
@@ -1067,7 +1093,7 @@ window.addEventListener("blur", () => input.keys.clear());
 function resize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  renderer.setSize(w, h, false);
+  world.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
@@ -1081,14 +1107,43 @@ renderQuests();
 
 const clock = new THREE.Clock();
 let started = false;
+const focusPoint = new THREE.Vector3();
+
+// Keep the tilt-shift band on whatever the camera is about: the traveler, the open object, or the planet.
+function updateFocus() {
+  if (cam.mode === "focus" && objects[cam.focusId]) focusPoint.copy(objects[cam.focusId].dir).multiplyScalar(R + 0.4);
+  else if (cam.mode === "follow") focusPoint.copy(traveler.group.position).addScaledVector(player.dir, 0.5);
+  else focusPoint.set(0, 0, 0);
+  world.setFocus(THREE.MathUtils.clamp(focusPoint.project(camera).y * 0.5 + 0.5, 0.1, 0.9));
+}
+
+// Measure the frame rate for a few seconds and step effects down on slower phones.
+// `?quality=0|1|2` in the URL pins a level instead.
+const pinnedQuality = new URLSearchParams(location.search).get("quality");
+const perf = { frames: 0, time: 0, done: pinnedQuality !== null };
+if (pinnedQuality !== null) world.setQuality(Number(pinnedQuality));
+
+function measure(dt, time) {
+  if (perf.done || time < 1.5) return;
+  perf.frames += 1;
+  perf.time += dt;
+  if (perf.time < 3) return;
+  perf.done = true;
+  const fps = perf.frames / perf.time;
+  if (fps < 24) world.setQuality(0);
+  else if (fps < 40) world.setQuality(1);
+}
 
 function frame() {
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const rawDt = clock.getDelta();
+  const dt = Math.min(rawDt, 0.05);
   const time = clock.elapsedTime;
+  measure(rawDt, time);
   world.update(dt, time);
   updatePlayer(dt, time);
   updateCamera(dt, time);
-  renderer.render(scene, camera);
+  updateFocus();
+  world.render(camera, time);
   updateLabels();
   if (!started) {
     started = true;
