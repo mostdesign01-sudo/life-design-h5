@@ -18,54 +18,54 @@ const SCORE_SCENES = {
       "泉水很清。这是你的底盘，别因为别的事忙起来就把它抽干。"
     ]
   },
-  volcano: {
+  workshop: {
     key: "work",
-    kicker: "火山 · 工作",
-    title: "两座活火山，要每天疏通。",
-    story: "不疏通，它们就会在某天突然喷发。工作也一样：投入、价值、回报，任何一项长期堵着，都会冒烟。",
+    kicker: "工坊 · 工作",
+    title: "星球上有一间小工坊。",
+    story: "炉子要天天清烟道。投入、价值、回报，任何一项长期堵着，烟囱就会冒黑烟，窗户也会烧得发红。",
     question: "你的工作仪表盘有几分？",
     reactions: [
-      "火山在冒黑烟。投入、价值或回报里，至少有一项已经堵了很久。",
-      "火山时不时冒烟。还在可控范围，但值得每周疏通一次：是什么在堆积？",
-      "火山很安静，只冒着一缕白烟。工作正在给你能量，而不只是拿走它。"
+      "烟囱在冒黑烟，炉子快过热了。投入、价值或回报里，至少有一项已经堵了很久。",
+      "烟囱时不时冒烟。还在可控范围，但值得每周清一次烟道：是什么在堆积？",
+      "烟囱只冒着一缕白烟，窗里是暖光。工作正在给你能量，而不只是拿走它。"
     ]
   },
-  chair: {
+  bench: {
     key: "play",
-    kicker: "日落椅 · 娱乐",
-    title: "在这颗星球上，把椅子往后挪几步，就能再看一次日落。",
-    story: "娱乐是纯粹为了快乐的事。不为效率，不为成长，也不为证明什么。",
+    kicker: "晚霞长椅 · 娱乐",
+    title: "这条长椅，只用来发呆。",
+    story: "坐下来，什么都不做，看一会儿天。娱乐是纯粹为了快乐的事：不为效率，不为成长，也不为证明什么。",
     question: "最近，纯粹为了快乐的时间有几分？",
     reactions: [
       "最近几乎没有为快乐留出时间。娱乐不是奖励，是燃料。",
-      "偶尔能看一次日落。试着把它从“有空再说”挪进日程里。",
+      "偶尔能坐下来看看天。试着把它从“有空再说”挪进日程里。",
       "你知道怎样让自己快乐。这是很稀缺的能力，别把它让给忙碌。"
     ]
   },
-  rose: {
+  lanterns: {
     key: "love",
-    kicker: "玫瑰 · 爱",
-    title: "玻璃罩下，有一朵只属于你的花。",
-    story: "爱是你和他人之间双向流动的连接。你为它花的时间，让它变得与众不同。",
+    kicker: "双生灯 · 爱",
+    title: "两盏灯，中间牵着一串小灯泡。",
+    story: "爱是双向流动的连接：一边亮着，另一边也会被照亮。灯串亮了几颗，取决于你们之间流动了多少。",
     question: "爱这一项，你给几分？",
     reactions: [
-      "玫瑰有点蔫。最近也许只有一个方向在流动，或者你已经很久没顾上它。",
-      "玫瑰开着，但还需要照看。谁值得你这周多花一点时间？",
-      "玫瑰开得很好。你为它花的那些时间，正是它重要的原因。"
+      "灯有点暗，灯串也只亮了几颗。最近也许只有一个方向在流动，或者你已经很久没顾上它。",
+      "灯亮着，但灯串还有不少暗着。谁值得你这周多花一点时间？",
+      "两盏灯都很亮，灯串一路亮到了对面。你为它花的那些时间，就是光的来源。"
     ]
   }
 };
 
 const QUESTS = [
   { id: "spring", name: "泉水", sub: "健康" },
-  { id: "volcano", name: "火山", sub: "工作" },
-  { id: "chair", name: "日落椅", sub: "娱乐" },
-  { id: "rose", name: "玫瑰", sub: "爱" },
-  { id: "baobab", name: "猴面包树", sub: "核心困扰" },
+  { id: "workshop", name: "工坊", sub: "工作" },
+  { id: "bench", name: "晚霞长椅", sub: "娱乐" },
+  { id: "lanterns", name: "双生灯", sub: "爱" },
+  { id: "vine", name: "缠绕藤", sub: "核心困扰" },
   { id: "sign", name: "星球日记", sub: "明信片" }
 ];
 
-const SCORE_IDS = ["spring", "volcano", "chair", "rose"];
+const SCORE_IDS = ["spring", "workshop", "bench", "lanterns"];
 const FULL_URL = "./index.html";
 
 const els = {
@@ -74,6 +74,7 @@ const els = {
   questCard: document.getElementById("questCard"),
   questHead: document.getElementById("questHead"),
   questList: document.getElementById("questList"),
+  questTitle: document.getElementById("questTitle"),
   questCount: document.getElementById("questCount"),
   overviewBtn: document.getElementById("overviewBtn"),
   hint: document.getElementById("hint"),
@@ -130,7 +131,7 @@ const cam = {
   focusId: null,
   offset: 0
 };
-// Intro: a low side view so the planet floats over the cloud sea against the sunset.
+// Intro: a low side view so the planet floats over the cloud sea at dusk.
 const orbit = {
   yaw: Math.atan2(POLE.x, POLE.z) - 0.5,
   pitch: 0.3,
@@ -164,7 +165,7 @@ let lastNearId = null;
 
 function isDone(id) {
   if (SCORE_IDS.includes(id)) return planet.visited.includes(id) || life.completed.includes("dashboard");
-  if (id === "baobab") return life.completed.includes("coreProblem");
+  if (id === "vine") return life.completed.includes("coreProblem");
   if (id === "sign") return life.completed.includes("dashboard");
   return false;
 }
@@ -193,6 +194,7 @@ function persist() {
 
 function renderQuests() {
   const done = QUESTS.filter(q => isDone(q.id)).length;
+  els.questTitle.textContent = `星球 ${planet.code}`;
   els.questCount.textContent = `${done} / ${QUESTS.length}`;
   els.questList.innerHTML = QUESTS.map((q, i) => `
     <li class="${isDone(q.id) ? "is-done" : ""}">
@@ -290,8 +292,8 @@ function scoreBand(score) {
   return score <= 3 ? 0 : score <= 6 ? 1 : 2;
 }
 
-function sunsetCount(score) {
-  return Math.max(1, Math.round(score * 4.4));
+function glowIndex(score) {
+  return score * 10;
 }
 
 function openScore(id) {
@@ -326,7 +328,7 @@ function openScore(id) {
         if (!planet.visited.includes(id)) planet.visited.push(id);
         persist();
         syncWorld();
-        const extra = id === "chair" ? `今天，你看了 ${sunsetCount(value)} 次日落。` : "";
+        const extra = id === "bench" ? `今天的晚霞指数：${glowIndex(value)}%` : "";
         els.sheetBody.innerHTML = `
           <div class="sheet-kicker">${scene.kicker} · ${value} 分</div>
           <h2 class="sheet-title" id="sheetTitle">${extra || "星球记住了。"}</h2>
@@ -404,7 +406,7 @@ function radarHTML(p) {
 function openProblem() {
   const existing = life.answers.coreProblem || "";
   openSheet({
-    focusId: "baobab",
+    focusId: "vine",
     actions: {
       submit() {
         const text = document.getElementById("problemInput").value.trim();
@@ -421,9 +423,9 @@ function openProblem() {
       }
     }
   }, `
-    <div class="sheet-kicker">猴面包树 · 核心困扰</div>
-    <h2 class="sheet-title" id="sheetTitle">小心猴面包树。</h2>
-    <p class="sheet-story">它小时候和玫瑰幼苗长得很像。等长大了，根会撑裂整颗星球。所以要趁早认出它：哪些是拔不动的现实，哪些是可以动手的部分。</p>
+    <div class="sheet-kicker">缠绕藤 · 核心困扰</div>
+    <h2 class="sheet-title" id="sheetTitle">星球上缠着一团藤。</h2>
+    <p class="sheet-story">有些藤是老根，扎得比你想的深，硬拔只会把自己耗干；有些只是新冒的芽，一伸手就能动。先认出哪部分是哪部分。</p>
     <p class="sheet-question">现在最让你焦虑、最想解决的那个人生问题是什么？</p>
     <textarea id="problemInput" placeholder="比如：我明明想换一种工作方式，但一直卡在收入、安全感、家人期待和自我怀疑之间……">${escapeHTML(existing)}</textarea>
     <p class="sheet-warn" id="problemWarn"></p>
@@ -437,9 +439,9 @@ function openProblem() {
 function showProblemResult(requestCoach) {
   const p = life.problem;
   const render = coach => `
-    <div class="sheet-kicker">猴面包树 · 核心困扰</div>
+    <div class="sheet-kicker">缠绕藤 · 核心困扰</div>
     <h2 class="sheet-title" id="sheetTitle">${escapeHTML(p.label)}</h2>
-    <p class="sheet-story">大树是你拔不动的那部分：接受它，别再和墙拔河。旁边发光的新芽，是你可以动手设计的部分。</p>
+    <p class="sheet-story">老藤是你拔不动的那部分：接受它，别再和墙拔河。旁边发光的新芽，是你可以动手设计的部分。</p>
     ${radarHTML(p)}
     <p class="reaction">${problemFeedback(p)}</p>
     ${coachHTML(coach)}
@@ -464,7 +466,7 @@ function showProblemResult(requestCoach) {
     sheetState.actions = actions;
     sheetState.token = token;
   } else {
-    openSheet({ focusId: "baobab", actions, token }, "");
+    openSheet({ focusId: "vine", actions, token }, "");
   }
   const existing = life.aiCoach.coreProblem;
   if (!requestCoach) {
@@ -535,11 +537,11 @@ function openDiary() {
 }
 
 const NEXT_PLANETS = [
-  ["国王星", "重力问题与可设计问题"],
-  ["点灯人星", "心流与能量"],
-  ["商人星", "工作观与人生观"],
-  ["麦田星", "锚点：你一直不肯放手的"],
-  ["三口井", "三个五年奥德赛计划"]
+  ["引力星", "重力问题与可设计问题"],
+  ["指南针星", "工作观与人生观"],
+  ["心流星", "心流与能量"],
+  ["锚点星", "锚点：你一直不肯放手的"],
+  ["三岔路星", "三个五年奥德赛计划"]
 ];
 
 function showPostcard() {
@@ -588,7 +590,7 @@ function openFarPlanet(p) {
 
 function openObject(id) {
   if (SCORE_SCENES[id]) openScore(id);
-  else if (id === "baobab") {
+  else if (id === "vine") {
     if (life.completed.includes("coreProblem") && life.problem) showProblemResult(false);
     else openProblem();
   } else if (id === "sign") openDiary();
@@ -646,12 +648,12 @@ function makePostcard() {
   ctx.fillText("我的小星球", 64, 120);
   ctx.font = `400 30px ${font}`;
   const date = new Date();
-  ctx.fillText(`${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")} · 今天看了 ${sunsetCount(Number(life.answers.dashboard.play ?? 5))} 次日落`, 66, 172);
+  ctx.fillText(`${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")} · 星球 ${planet.code} · 晚霞指数 ${glowIndex(Number(life.answers.dashboard.play ?? 5))}%`, 66, 172);
 
   ctx.fillStyle = "#fffbf4";
   ctx.fillRect(0, size, size, 1480 - size);
   const d = life.answers.dashboard;
-  const icons = { health: "泉水", work: "火山", play: "日落", love: "玫瑰" };
+  const icons = { health: "泉水", work: "工坊", play: "晚霞", love: "双生灯" };
   dashboardItems.forEach((item, i) => {
     const x = 64 + i * 245;
     const score = Number(d[item.key] ?? 5);
@@ -674,7 +676,7 @@ function makePostcard() {
   ctx.fillText(clip(`红灯：${low.label}${note ? ` —— ${note}` : ""}`, 32), 64, size + 248);
   if (life.problem) {
     ctx.fillStyle = "rgba(35,29,43,0.7)";
-    ctx.fillText(`猴面包树：重力 ${life.problem.gravity}% · 可设计 ${life.problem.designable}%`, 64, size + 298);
+    ctx.fillText(`缠绕藤：重力 ${life.problem.gravity}% · 可设计 ${life.problem.designable}%`, 64, size + 298);
   }
   ctx.fillStyle = "rgba(35,29,43,0.45)";
   ctx.font = `400 24px ${font}`;
@@ -725,10 +727,15 @@ function updateCamera(dt, time) {
     const obj = objects[cam.focusId];
     const od = obj.dir;
     const objPos = od.clone().multiplyScalar(R);
-    const away = tangentToward(od, player.dir);
-    if (away.lengthSq() < 0.5) away.copy(camForward).negate();
-    // Look from the far side, slightly off-axis, so the traveler stands facing the object in frame.
-    away.applyAxisAngle(od, 2.4);
+    let away;
+    if (obj.front) {
+      away = obj.front.clone().applyAxisAngle(od, 0.8);
+    } else {
+      away = tangentToward(od, player.dir);
+      if (away.lengthSq() < 0.5) away.copy(camForward).negate();
+      // Look from the far side, slightly off-axis, so the traveler stands facing the object in frame.
+      away.applyAxisAngle(od, 2.4);
+    }
     const f = obj.focus * portraitScale(0.9);
     desired.pos.copy(objPos).addScaledVector(od, 2.2 * f).addScaledVector(away, 4.4 * f);
     desired.look.copy(objPos).addScaledVector(od, 0.45 * obj.focus);
@@ -851,11 +858,9 @@ function updatePlayer(dt, time) {
   traveler.arms[1].rotation.x = swing * 0.7;
   traveler.body.position.y = Math.abs(Math.sin(player.phase)) * 0.04 * s + Math.sin(time * 2) * 0.008;
   traveler.head.rotation.z = Math.sin(time * 1.3) * 0.04 * (1 - s);
-  traveler.scarf.forEach((seg, i) => {
-    const flutter = Math.sin(time * (5 + s * 5) - i * 0.9) * (0.12 + 0.28 * s);
-    seg.rotation.x = (i === 0 ? -1.1 + s * 0.95 : -0.12 + s * 0.05) + flutter;
-    seg.rotation.y = Math.sin(time * 2.2 - i * 0.7) * 0.15;
-  });
+  traveler.pack.position.y = 0.5 + Math.abs(Math.cos(player.phase)) * 0.025 * s;
+  traveler.pack.rotation.x = -0.08 * s;
+  traveler.charm.rotation.z = Math.sin(player.phase) * 0.5 * s + Math.sin(time * 1.7) * 0.08;
 
   updateNearby();
 }
@@ -1095,4 +1100,4 @@ function frame() {
 requestAnimationFrame(frame);
 
 // Testing hook: lets automated checks drive the scene without pointer gestures.
-window.__b612 = { goTo, setOverview, setFollow, openObject, closeSheet, life: () => life, autoTarget: () => autoTarget, cam, player };
+window.__planet = { goTo, setOverview, setFollow, openObject, closeSheet, life: () => life, autoTarget: () => autoTarget, cam, player };

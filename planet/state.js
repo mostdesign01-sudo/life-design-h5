@@ -1,7 +1,7 @@
 // Shares progress with index.html: same localStorage key and the same state shape,
 // so answers given on the planet show up in the full questionnaire and report.
 const STORAGE_KEY = "lifeDesignH5StateV1";
-const PLANET_KEY = "lifeDesignB612V1";
+const PLANET_KEY = "lifeDesignPlanetV1";
 const AI_ENDPOINT_STORAGE_KEY = "lifeDesignAiEndpointV1";
 const DEFAULT_AI_ENDPOINT = "https://api.mostdesign.cn/api/analyze-life-design";
 const AI_USER_STORAGE_KEY = "lifeDesignAnonymousUserV1";
@@ -68,7 +68,13 @@ export function saveLifeState(state) {
 
 export function loadPlanetState() {
   const parsed = readJSON(PLANET_KEY) || {};
-  return { visited: Array.isArray(parsed.visited) ? parsed.visited : [] };
+  const planet = {
+    // Each visitor gets their own planet number, shown on the HUD and the postcard.
+    code: typeof parsed.code === "string" ? parsed.code : `LD-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+    visited: Array.isArray(parsed.visited) ? parsed.visited : []
+  };
+  if (!parsed.code) writeJSON(PLANET_KEY, planet);
+  return planet;
 }
 
 export function savePlanetState(planet) {
