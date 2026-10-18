@@ -16,10 +16,12 @@ const to = Math.round(Number(TO ?? timing.length) * fps);
 fs.mkdirSync(OUT, { recursive: true });
 
 // Demo answers, written before the page loads. The postcard is drawn from these final values.
-// Story: the hook shows the planet at its best; on landing it drops to where a real week might be
-// (dark smoke, lamps out, grey sky); each stop then brings one part back.
+// Story: the hook shows the planet at its best (the poster's sunset bench); on landing it drops to
+// where a real week might be (dark smoke, lamps out, grey sky); each stop then brings one part back.
 const FINAL = { health: 7, work: 9, play: 9, love: 10 };
-const HOOK = { health: 7, work: 8, play: 8, love: 8 };
+const HOOK = FINAL;
+// Opening shot: the poster's staging (promo/stage.js), pushing in slowly.
+const OPENING = { props: 1.8, clearAngle: 1.2, from: { elevation: 8, lookUp: 1.2, view: 12.5 }, to: { elevation: 8, lookUp: 1.6, view: 11 }, sunNdc: [0.46, -0.1] };
 
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || undefined,
@@ -90,13 +92,14 @@ await page.evaluate(({ final, start }) => {
 }, { final: toTargets(FINAL), start: toTargets(HOOK) });
 
 // Director: the camera plan for each segment, as a function of time.
-await page.evaluate(timing => {
+await page.addScriptTag({ path: path.join(path.dirname(new URL(import.meta.url).pathname), "stage.js") });
+await page.evaluate(({ timing, opening }) => {
   const P = window.__planet;
   const seg = Object.fromEntries(timing.segments.map(s => [s.id, s]));
   const ev = timing.events;
   // Same side-on angle as the product's own intro, so trees and houses stand up on the horizon.
   const baseYaw = Math.atan2(0.4, 0.5) - 0.5;
-  // Wide orbit for the hook and the ending: the planet sits a little low so the title has the sky.
+  // Wide orbit for the ending, and the whole-planet view the dive starts from.
   const orbit = (desired, t, yawOffset, pitch, view, lookY) => {
     const yaw = baseYaw + yawOffset + t * 0.07;
     desired.dir.set(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw));
@@ -105,10 +108,27 @@ await page.evaluate(timing => {
     desired.view = view;
   };
   window.__director = { t: 0 };
-  const orbitShot = desired => {
-    const t = window.__director.t;
-    if (t < seg.dive.start) orbit(desired, t * 3.2, 0, -0.08, 29 - t * 1.6, 2.2 - t * 0.2);
-    else orbit(desired, t, 0.4, 0.4, 34, -2.5);
+  const orbitShot = desired => orbit(desired, window.__director.t, 0.4, 0.4, 34, -2.5);
+  // Opening: the staged sunset bench, pushing in over the hook.
+  const openingShot = desired => {
+    const k = Math.min(1, window.__director.t / seg.dive.start);
+    const lerp = key => opening.from[key] + (opening.to[key] - opening.from[key]) * k;
+    window.__stage.shot(desired, { elevation: lerp("elevation"), lookUp: lerp("lookUp"), view: lerp("view") });
+  };
+  // The cut at the dive is a match cut: the same angle pulled far back, so the bench (traveler still
+  // seated) sits on the crest of the whole planet. The traveler stays on the bench for the rest of the
+  // film, so the dive lands there and the sky stop shows them watching the sunset.
+  window.__director.cutToWide = () => {
+    const od = P.world.objects.bench.dir;
+    const bench = P.world.objects.bench.parts[0];
+    const fwd = od.clone().set(0, 0, 1).applyQuaternion(bench.quaternion);
+    fwd.addScaledVector(od, -fwd.dot(od)).normalize();
+    P.player.dir.copy(od);
+    P.player.facing.copy(fwd);
+    // Aimed just below the bench, so it stays near where it was on screen and the cut reads as a pull-back.
+    P.cam.look.copy(od).multiplyScalar(4.6);
+    P.cam.up.copy(od);
+    P.cam.view = 17;
   };
   // Sky stop: the bench seen from the sunward side, so the camera faces the warm, saturated half of
   // the evening sky (looking into the sun washes everything out to cream).
@@ -136,12 +156,13 @@ await page.evaluate(timing => {
   window.__director.apply = t => {
     window.__director.t = t;
     // The diary signpost stands just below the sky shot's frame and its lamp flares into the corner.
-    P.world.objects.sign.parts[0].visible = !(t >= seg.sky.start && t < seg.postcard.start - 0.3);
+    // (Before the dive the opening's staging owns the signpost.)
+    if (t >= seg.dive.start) P.world.objects.sign.parts[0].visible = !(t >= seg.sky.start && t < seg.postcard.start - 0.3);
     if (t >= seg.sky.start - 0.3 && t < seg.postcard.start - 0.3) {
       P.cam.director = benchShot;
       P.cam.directorRate = 3;
     } else if (t < seg.dive.start) {
-      P.cam.director = orbitShot;
+      P.cam.director = openingShot;
       P.cam.directorRate = 30;
     } else if (t >= seg.postcard.start - 0.3) {
       P.cam.director = orbitShot;
@@ -151,13 +172,17 @@ await page.evaluate(timing => {
       P.cam.directorRate = undefined;
     }
   };
-}, timing);
+}, { timing, opening: OPENING });
 
-// Warm up so the opening pop-ins have settled and frame 0 is a finished picture.
-await page.evaluate(() => {
+// Warm up so the opening pop-ins have settled and frame 0 is a finished picture, then set the sun
+// for the opening shot from where the camera has come to rest.
+await page.evaluate(opening => {
+  window.__stage.enter({ props: opening.props, clearAngle: opening.clearAngle });
   window.__director.apply(0);
   for (let i = 0; i < 75; i += 1) window.__advance(1000 / 30);
-});
+  window.__stage.placeSun(opening.sunNdc);
+  for (let i = 0; i < 3; i += 1) window.__advance(1000 / 30);
+}, OPENING);
 
 const scoreAt = (t, steps) => {
   let n = steps.from;
@@ -165,12 +190,13 @@ const scoreAt = (t, steps) => {
   return n;
 };
 
-let state = { dove: false, focus: null, celebrated: new Set() };
+let state = { dove: false, unlocked: false, focus: null, celebrated: new Set() };
 for (let f = 0; f < to; f += 1) {
   const t = f / fps;
   const seg = Object.fromEntries(timing.segments.map(s => [s.id, s]));
   const ev = timing.events;
-  const hook = t < ev.dive;
+  // The opening's evening (and its scores) holds for half a second past the cut.
+  const hook = t < ev.dive + 0.5;
   const work = hook ? HOOK.work : scoreAt(t, ev.work);
   const love = hook ? HOOK.love : scoreAt(t, ev.bulbs);
   const play = hook ? HOOK.play : scoreAt(t, ev.play);
@@ -181,19 +207,29 @@ for (let f = 0; f < to; f += 1) {
         : t >= seg.workshop.start - 0.45 ? "workshop" : null;
   const actions = {
     dive: t >= ev.dive && !state.dove,
+    // The planet holds focus through the cut; the page's own focus takes over once the dive is under way.
+    unlock: t >= ev.dive + 0.5 && !state.unlocked,
     focus: focus !== state.focus ? focus : undefined,
     celebrate: [["workshop", ev.work], ["lanterns", ev.bulbs], ["bench", ev.play]]
       .filter(([id, steps]) => t >= steps.steps[steps.steps.length - 1] + 0.1 && !state.celebrated.has(id))
       .map(([id]) => id)
   };
   if (actions.dive) state.dove = true;
+  if (actions.unlock) state.unlocked = true;
   if (actions.focus !== undefined) state.focus = focus;
   actions.celebrate.forEach(id => state.celebrated.add(id));
 
   await page.evaluate(({ t, work, love, play, actions, focusId }) => {
     const P = window.__planet;
     window.__director.apply(t);
-    if (actions.dive) P.setFollow();
+    if (actions.dive) {
+      window.__stage.leave({ keepSeat: true });
+      window.__director.cutToWide();
+      P.setFollow();
+      // Already wide after the cut, so skip the dive's own pull-back beat.
+      P.cam.dive -= 0.3;
+    }
+    if (actions.unlock) window.__stage.unlockFocus();
     if (focusId) {
       P.cam.mode = "focus";
       P.cam.focusId = focusId;

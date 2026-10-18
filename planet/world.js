@@ -1432,7 +1432,7 @@ export function createWorld(canvas) {
   }
 
   return {
-    renderer, scene, camera, sky, objects, farPlanets, blockers,
+    renderer, scene, camera, sky, clouds: clouds.group, trees: trees.map(t => t.group), bushes, objects, farPlanets, blockers,
     setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust, celebrate, setDiaryReady, setNearCull,
     setFocus: post.setFocus
   };

@@ -58,7 +58,7 @@
 - `brief.md`：片子的取舍和结构。`facts.json` 列出画面上每句话的出处，片中分数都标「示例」。`style.md` 是样式规范，`ledger.md` 记录每轮评审的问题和改法。
 - 先写声音：`python3 promo/music.py <工作目录>` 生成音乐、音效和 `timing.json`，画面按这份时间表踩点。
 - 渲染：先在仓库根目录起一个静态服务（如 `python3 -m http.server 8612`），再运行 `node promo/render.mjs http://127.0.0.1:8612 <工作目录>/timing.json <工作目录>/frames`。页面跑在虚拟时钟上，每一帧都只由帧号决定，可以只重渲某一段（末尾加上起止秒数）。
-- 海报：`node promo/poster.mjs http://127.0.0.1:8612 <输出.jpg>` 输出 3:4 海报（1080×1440）：长椅上的旅人背对镜头看夕阳，排版在 `promo/poster.html`。布景只用于静帧，产品本身不变。
+- 海报：`node promo/poster.mjs http://127.0.0.1:8612 <输出.jpg>` 输出 3:4 海报（1080×1440）：长椅上的旅人背对镜头看夕阳，排版在 `promo/poster.html`。布景（旅人坐下、道具放大、隐去杂物、摆太阳）写在 `promo/stage.js`，宣传片开场 2.5 秒也用它；产品本身不变。
 - 编码和检查：`promo/encode.sh <工作目录>` 输出 `promo-9x16.mp4` 和纯音乐版 `music-only.m4a`（响度 -14 LUFS）；`promo/qa.sh <视频> <输出目录>` 输出规格、冻结检测、响度和联系表。
 - 改了片中文字后，重新生成字体子集：`python3 scripts/subset-font.py <fontsource 包目录> . 600 promo/promo-serif-600.woff2 promo/overlay.js`。
 
