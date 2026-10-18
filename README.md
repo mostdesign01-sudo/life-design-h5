@@ -45,7 +45,7 @@
 
 操作：手机左侧拖动移动、右侧拖动转视角、双指缩放；电脑 WASD 移动、拖动鼠标转视角、滚轮缩放、Enter 查看。点任意物件，角色会自己走过去。
 
-技术上是纯静态的 Three.js（`vendor/three.module.min.js` 及 `vendor/three-addons/` 里的后期处理模块，r160，MIT），无构建、不依赖 CDN。画面走几何设计风：正交视角、三阶平涂明暗、低饱和马卡龙配色，物件都是方块、圆柱、圆锥拼成的小建筑，背景是一张平面插画（渐变天空、太阳和纸片云），只叠加轻微的泛光和暗角。所有模型都是代码生成的。代码在 [`planet/`](planet/)：`world.js` 搭场景，`look.js` 负责后期与背景插画，`main.js` 管镜头、操作和对话，`state.js` 负责和问卷共用进度。
+技术上是纯静态的 Three.js（`vendor/three.module.min.js` 及 `vendor/three-addons/` 里的后期处理模块，r160，MIT），无构建、不依赖 CDN。画面是“温暖写意的自然 + 克制的设计感”：金色斜阳、柔和投影、天空环境光、随风的草和树、积云，叠加泛光、移轴和调色；文字和界面用克制的排版。曾试过纪念碑谷式的平涂几何风格，最终没有采用。所有模型都是代码生成的。代码在 [`planet/`](planet/)：`world.js` 搭场景，`look.js` 负责后期与手绘贴图，`main.js` 管镜头、操作和对话，`state.js` 负责和问卷共用进度。
 
 排版用两种字体：标题、名称和数字用思源宋体子集（`vendor/fonts/`，SIL OFL，约 100KB，只含页面用到的字），正文用系统黑体。改了页面上的中文文案后，用 `scripts/subset-font.py` 重新生成字体子集。完整的视觉、排版、动效和检查流程写在项目 skill [`.claude/skills/planet-design/SKILL.md`](.claude/skills/planet-design/SKILL.md) 里，做新星球时按它来。
 

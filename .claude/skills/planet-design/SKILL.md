@@ -5,7 +5,9 @@ description: Visual, typographic and motion rules for the 3D "你的小星球" p
 
 # 小星球设计规范
 
-The planet is a flat-shaded geometric diorama in soft pastels, viewed through an orthographic camera. Everything on screen should feel like one designed object: few colours, one display face, generous space, and every answer visibly changing the world.
+The look is "warm, painterly nature with restrained design": a small planet in golden-hour light (soft shadows, sky-lit ambient, wind in the grass, bloom and a gentle tilt-shift) seen through a long perspective lens, with calm, editorial typography and UI on top. The warmth carries the emotion; the type, palette discipline and spacing keep it from feeling childish. Every answer visibly changes the world.
+
+A flat, Monument Valley-style version was tried and rejected: on a sphere covered in small props it read as a toy rather than as architecture, and it lost the light that makes the planet feel alive. Do not drift back toward flat shading or a pastel-only palette.
 
 ## Typography
 
@@ -21,8 +23,8 @@ The planet is a flat-shaded geometric diorama in soft pastels, viewed through an
 
 ## Colour
 
-- The palette lives in `PAL` in `planet/world.js`: ground mint, cream and stone for buildings, terracotta and coral roofs and seats, teal accents, navy details, gold light, lilac and pink in small doses.
-- New objects pick from `PAL`. Do not introduce saturated primaries.
+- The world palette is natural and warm: meadow greens (`MEADOW` in `planet/world.js`), warm woods, a terracotta roof, stone, clear teal water, and gold lamp light against a blue sky with a peach horizon.
+- New objects use the same families. Keep accents rare: one warm light, one roof red. No neon or toy primaries.
 - The UI accent is `--accent` #c95a26 (white text on it passes 4.5:1).
 - Text contrast is at least 4.5:1 everywhere, including label subtitles and postcard captions. Check this when lightening anything grey.
 - Scores must change the world in a way you can read from a screenshot, pushed to both extremes:
@@ -33,8 +35,10 @@ The planet is a flat-shaded geometric diorama in soft pastels, viewed through an
 
 ## Shape and materials
 
-- Build from boxes, cylinders, cones, spheres and capsules with `MeshToonMaterial` and the three-step `TOON_RAMP`.
-- No textures, no cast shadows. A soft navy `addShadowDisc` grounds each object.
+- Build with `MeshStandardMaterial`, using rounded boxes (`RoundedBoxGeometry`) and the painted canvas textures in `planet/look.js` (wood, roof tiles, stone). Foliage uses vertex-coloured blobs, shaded from dark at the base to sunlit at the crown.
+- Objects cast soft shadows and sit on a contact blob (`addBlob`).
+- Keep detail where the eye lands: the props and the traveler. The ground stays calm.
+- The traveler is a small person, not a doll: long legs, a smaller head, muted jacket and beanie, no blush.
 - Glow (`glow()` plus `addHalo`) is reserved for things that mean something: lamps, windows, the sprout, the diary gem. Keep emissive values below the bloom threshold when items need to be counted.
 - Anything the user must count or compare should be large and separated at the stop's close-up framing.
 

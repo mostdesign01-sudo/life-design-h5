@@ -4,14 +4,17 @@ import { RenderPass } from "../vendor/three-addons/postprocessing/RenderPass.js"
 import { ShaderPass } from "../vendor/three-addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "../vendor/three-addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "../vendor/three-addons/postprocessing/OutputPass.js";
+import { HorizontalTiltShiftShader } from "../vendor/three-addons/shaders/HorizontalTiltShiftShader.js";
+import { VerticalTiltShiftShader } from "../vendor/three-addons/shaders/VerticalTiltShiftShader.js";
 
-// Light finishing pass: a touch of saturation and a soft vignette, nothing that muddies flat colour.
+// Painterly grade: a little extra saturation, warm highlights, cool lilac shadows, soft vignette.
 const GradeShader = {
   name: "GradeShader",
   uniforms: {
     tDiffuse: { value: null },
     uSaturation: { value: 1.12 },
-    uVignette: { value: 0.45 }
+    uVignette: { value: 0.9 },
+    uTime: { value: 0 }
   },
   vertexShader: `
     varying vec2 vUv;
@@ -24,13 +27,19 @@ const GradeShader = {
     uniform sampler2D tDiffuse;
     uniform float uSaturation;
     uniform float uVignette;
+    uniform float uTime;
     varying vec2 vUv;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
       vec3 c = texture2D(tDiffuse, vUv).rgb;
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       c = mix(vec3(l), c, uSaturation);
+      float t = smoothstep(0.0, 0.9, l);
+      c *= mix(vec3(0.88, 0.9, 1.1), vec3(1.06, 1.0, 0.9), t);
       vec2 d = vUv - 0.5;
       c *= 1.0 - dot(d, d) * uVignette;
+      // Faint paper grain keeps large flat areas from looking digital.
+      c += (hash(vUv * 900.0 + uTime) - 0.5) * 0.012;
       gl_FragColor = vec4(c, 1.0);
     }
   `
@@ -40,117 +49,177 @@ export function createPost(renderer, scene, camera) {
   const size = renderer.getSize(new THREE.Vector2());
   const composer = new EffectComposer(renderer);
   const renderPass = new RenderPass(scene, camera);
-  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.4, 0.45, 0.92);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.5, 0.5, 0.95);
+  const tiltH = new ShaderPass(HorizontalTiltShiftShader);
+  const tiltV = new ShaderPass(VerticalTiltShiftShader);
+  const grade = new ShaderPass(GradeShader);
   composer.addPass(renderPass);
   composer.addPass(bloom);
-  composer.addPass(new ShaderPass(GradeShader));
+  composer.addPass(tiltH);
+  composer.addPass(tiltV);
+  composer.addPass(grade);
   composer.addPass(new OutputPass());
 
+  let blur = 2.2;
+  let focusY = 0.45;
+
+  function setSize(w, h, pixelRatio) {
+    composer.setPixelRatio(pixelRatio);
+    composer.setSize(w, h);
+    tiltH.uniforms.h.value = blur / (w * pixelRatio);
+    tiltV.uniforms.v.value = blur / (h * pixelRatio);
+  }
+
   return {
-    setSize(w, h, pixelRatio) {
-      composer.setPixelRatio(pixelRatio);
-      composer.setSize(w, h);
+    composer,
+    setSize,
+    setTiltShift(enabled) {
+      tiltH.enabled = enabled;
+      tiltV.enabled = enabled;
     },
     setBloom(enabled) {
       bloom.enabled = enabled;
     },
-    render(cam) {
+    // `y` is the screen height (0 bottom, 1 top) that stays sharp.
+    setFocus(y, immediate = false) {
+      focusY = immediate ? y : focusY + (y - focusY) * 0.15;
+      tiltH.uniforms.r.value = focusY;
+      tiltV.uniforms.r.value = focusY;
+    },
+    render(cam, time) {
       renderPass.camera = cam;
+      grade.uniforms.uTime.value = time % 10;
       composer.render();
     }
   };
 }
 
-function canvasTexture(width, height, draw) {
+// ---------- painted canvas textures ----------
+
+function canvasTexture(width, height, draw, { repeat = false, srgb = true } = {}) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   draw(canvas.getContext("2d"), width, height);
   const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
+  if (srgb) tex.colorSpace = THREE.SRGBColorSpace;
+  if (repeat) tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
   return tex;
+}
+
+function seeded(seed) {
+  return () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
 }
 
 export function softTexture() {
   return canvasTexture(64, 64, (ctx, w) => {
     const g = ctx.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
     g.addColorStop(0, "rgba(255,255,255,1)");
-    g.addColorStop(0.45, "rgba(255,255,255,0.5)");
+    g.addColorStop(0.45, "rgba(255,255,255,0.55)");
     g.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, w);
   });
 }
 
-// One paper cloud: round bumps on a flat base with a lilac underside. Drawn on its own canvas so the
-// underside tint only lands on the cloud, then stamped onto the backdrop.
-function drawCloud(ctx, x, y, width, tint, shade) {
-  const h = Math.ceil(width * 0.5);
-  const w = Math.ceil(width);
-  const layer = document.createElement("canvas");
-  layer.width = w;
-  layer.height = h;
-  const c = layer.getContext("2d");
-  const base = h * 0.92;
-  c.fillStyle = tint;
-  [[0.24, 0.17], [0.43, 0.27], [0.62, 0.22], [0.78, 0.15]].forEach(([fx, fr]) => {
-    c.beginPath();
-    c.arc(w * fx, base - w * fr * 0.75, w * fr, 0, Math.PI * 2);
-    c.fill();
+export function blobTexture() {
+  return canvasTexture(64, 64, (ctx, w) => {
+    const g = ctx.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+    g.addColorStop(0, "rgba(0,0,0,0.75)");
+    g.addColorStop(0.55, "rgba(0,0,0,0.35)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, w);
   });
-  const bandH = w * 0.1;
-  c.beginPath();
-  c.arc(w * 0.12 + bandH / 2, base - bandH / 2, bandH / 2, Math.PI / 2, Math.PI * 1.5);
-  c.arc(w * 0.88 - bandH / 2, base - bandH / 2, bandH / 2, Math.PI * 1.5, Math.PI / 2);
-  c.closePath();
-  c.fill();
-  c.globalCompositeOperation = "source-atop";
-  c.fillStyle = shade;
-  c.fillRect(0, base - bandH * 0.75, w, h);
-  c.globalCompositeOperation = "destination-out";
-  c.fillRect(0, base, w, h);
-  ctx.drawImage(layer, x, y - h * 0.5);
 }
 
-// The whole backdrop is a flat illustration in screen space: gradient sky, sun disc and paper clouds.
-// It is redrawn only when the screen size or the play score changes.
-export function createBackdrop() {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const clouds = [[0.04, 0.62, 0.34], [0.58, 0.7, 0.42], [0.3, 0.84, 0.3], [0.72, 0.36, 0.2], [0.08, 0.3, 0.16], [0.86, 0.9, 0.3]];
-  return {
-    texture,
-    paint(width, height, colors) {
-      const scale = Math.min(1, 900 / Math.max(width, height));
-      canvas.width = Math.round(width * scale);
-      canvas.height = Math.round(height * scale);
-      const w = canvas.width;
-      const h = canvas.height;
-      const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, `#${colors.top.getHexString()}`);
-      g.addColorStop(0.55, `#${colors.middle.getHexString()}`);
-      g.addColorStop(1, `#${colors.bottom.getHexString()}`);
+// A cumulus puff: overlapping soft circles, sunlit on top and lilac underneath.
+export function cloudTexture(seed) {
+  const rand = seeded(seed);
+  return canvasTexture(256, 256, (ctx, w, h) => {
+    for (let i = 0; i < 18; i += 1) {
+      const x = w * (0.2 + rand() * 0.6);
+      const y = h * (0.35 + rand() * 0.3) - Math.sin((x / w) * Math.PI) * h * 0.12;
+      const r = w * (0.1 + rand() * 0.14);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, "rgba(255,255,255,1)");
+      g.addColorStop(0.7, "rgba(255,255,255,0.9)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
       ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
-      const unit = Math.min(w, h);
-      ctx.fillStyle = `#${colors.sunRing.getHexString()}`;
-      ctx.globalAlpha = 0.45 * (colors.sunStrength ?? 1);
       ctx.beginPath();
-      ctx.arc(w * 0.8, h * 0.17, unit * 0.15, 0, Math.PI * 2);
+      ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
-      // On an overcast (low play) sky the sun fades back behind the haze.
-      ctx.globalAlpha = 0.35 + 0.65 * (colors.sunStrength ?? 1);
-      ctx.fillStyle = `#${colors.sun.getHexString()}`;
-      ctx.beginPath();
-      ctx.arc(w * 0.8, h * 0.17, unit * 0.095, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      const tint = `#${colors.cloud.getHexString()}`;
-      const shade = `#${colors.cloudShade.getHexString()}`;
-      clouds.forEach(([fx, fy, fw]) => drawCloud(ctx, w * fx, h * fy, Math.max(w, h * 0.6) * fw, tint, shade));
-      texture.needsUpdate = true;
     }
-  };
+    ctx.globalCompositeOperation = "source-atop";
+    const shade = ctx.createLinearGradient(0, h * 0.2, 0, h * 0.75);
+    shade.addColorStop(0, "#fffaf0");
+    shade.addColorStop(0.55, "#f6eee8");
+    shade.addColorStop(1, "#b9b6dc");
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 0, w, h);
+  });
+}
+
+export function woodTexture(base = "#b98552", seed = 3) {
+  const rand = seeded(seed);
+  return canvasTexture(128, 128, (ctx, w, h) => {
+    const rows = 6;
+    for (let i = 0; i < rows; i += 1) {
+      const c = new THREE.Color(base).offsetHSL((rand() - 0.5) * 0.02, (rand() - 0.5) * 0.1, (rand() - 0.5) * 0.08);
+      ctx.fillStyle = `#${c.getHexString()}`;
+      ctx.fillRect(0, (i * h) / rows, w, h / rows);
+      ctx.fillStyle = "rgba(60,30,10,0.35)";
+      ctx.fillRect(0, ((i + 1) * h) / rows - 2, w, 2);
+      ctx.strokeStyle = "rgba(70,40,20,0.18)";
+      for (let k = 0; k < 3; k += 1) {
+        const y = (i * h) / rows + rand() * (h / rows);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.bezierCurveTo(w * 0.3, y + 2, w * 0.6, y - 2, w, y + 1);
+        ctx.stroke();
+      }
+    }
+  }, { repeat: true });
+}
+
+export function shingleTexture(base = "#c4553d") {
+  const rand = seeded(11);
+  return canvasTexture(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, w, h);
+    const rows = 8;
+    for (let r = 0; r < rows; r += 1) {
+      const y = (r * h) / rows;
+      const offset = r % 2 ? w / 12 : 0;
+      for (let x = -offset; x < w; x += w / 6) {
+        const c = new THREE.Color(base).offsetHSL(0, (rand() - 0.5) * 0.1, (rand() - 0.5) * 0.12);
+        ctx.fillStyle = `#${c.getHexString()}`;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x + 1, y + 1, w / 6 - 2, h / rows - 1, [0, 0, 6, 6]);
+        else ctx.rect(x + 1, y + 1, w / 6 - 2, h / rows - 1);
+        ctx.fill();
+      }
+      ctx.fillStyle = "rgba(40,10,0,0.3)";
+      ctx.fillRect(0, y + h / rows - 2, w, 2);
+    }
+  }, { repeat: true });
+}
+
+export function stoneTexture() {
+  const rand = seeded(7);
+  return canvasTexture(128, 128, (ctx, w, h) => {
+    ctx.fillStyle = "#9a948c";
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 30; i += 1) {
+      const c = new THREE.Color("#a39d94").offsetHSL(0, 0, (rand() - 0.5) * 0.18);
+      ctx.fillStyle = `#${c.getHexString()}`;
+      ctx.beginPath();
+      ctx.ellipse(rand() * w, rand() * h, 8 + rand() * 12, 6 + rand() * 8, rand() * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }, { repeat: true });
 }

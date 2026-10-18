@@ -131,9 +131,11 @@ const player = {
 };
 const camForward = player.facing.clone();
 
-// Orthographic camera state: a viewing direction, a look-at point and how many world units fit
-// vertically on screen, each smoothed toward a per-mode target.
-const CAM_DISTANCE = 60;
+// Camera state: a viewing direction, a look-at point and how many world units fit vertically
+// on screen at the look-at point, each smoothed toward a per-mode target. The perspective camera
+// is placed at whatever distance gives that framing, with a fairly long lens so the planet keeps
+// a diorama feel without fisheye distortion.
+const FOV = 34;
 const cam = {
   mode: "intro",
   dir: new THREE.Vector3(),
@@ -165,11 +167,13 @@ function viewHeightFor(height, minWidth) {
   return Math.max(height, minWidth / aspect);
 }
 
-function applyView(cameraToSet, height, aspect) {
-  cameraToSet.left = (-height * aspect) / 2;
-  cameraToSet.right = (height * aspect) / 2;
-  cameraToSet.top = height / 2;
-  cameraToSet.bottom = -height / 2;
+function distanceFor(height) {
+  return height / 2 / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+}
+
+function applyView(cameraToSet, aspect) {
+  cameraToSet.fov = FOV;
+  cameraToSet.aspect = aspect;
   cameraToSet.updateProjectionMatrix();
 }
 
@@ -731,11 +735,15 @@ function makePostcard() {
   const shotCam = camera.clone();
   shotCam.clearViewOffset();
   // Look down on the lived-in side so every stop sits on the visible half of the planet.
-  const view = POLE.clone().multiplyScalar(0.8).addScaledVector(SUN, 0.35).normalize();
-  shotCam.position.copy(view).multiplyScalar(CAM_DISTANCE);
+  // The intro's three-quarter view: the whole planet floating in its window, with the trees on the
+  // rim standing up in profile, rather than a top-down map.
+  const yaw = Math.atan2(POLE.x, POLE.z) - 0.5;
+  const pitch = 0.62;
+  const view = new THREE.Vector3(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw));
+  shotCam.position.copy(view).multiplyScalar(distanceFor(16.2));
   shotCam.up.set(0, 1, 0);
   shotCam.lookAt(0, 0, 0);
-  applyView(shotCam, 15.2, 1);
+  applyView(shotCam, 1);
   // The window behind the planet carries the play score: warm when there was time for joy, grey when not.
   const tint = world.skyTint().lerp(new THREE.Color("#fbf3e8"), 0.35);
   const shot = world.snapshot(shotCam, W, tint);
@@ -956,10 +964,12 @@ function updateCamera(dt, time) {
   cam.look.lerp(desired.look, k);
   cam.up.lerp(desired.up, k).normalize();
   cam.view += (desired.view - cam.view) * k;
-  camera.position.copy(cam.look).addScaledVector(cam.dir, CAM_DISTANCE);
+  camera.position.copy(cam.look).addScaledVector(cam.dir, distanceFor(cam.view));
+  // Keep the lens outside the planet while it travels between modes.
+  if (camera.position.length() < R + 0.5) camera.position.setLength(R + 0.5);
   camera.up.copy(cam.up);
   camera.lookAt(cam.look);
-  applyView(camera, cam.view, window.innerWidth / window.innerHeight);
+  applyView(camera, window.innerWidth / window.innerHeight);
   // While a sheet is open, shift the projection so the scene centres in the space above it.
   const sheetH = sheetState ? els.sheet.offsetHeight : 0;
   const hud = cam.mode === "focus" ? HUD_HEIGHT : 0;
@@ -1094,7 +1104,7 @@ function updatePlayer(dt, time) {
   traveler.head.rotation.z = Math.sin(time * 1.3) * 0.04 * idle;
   traveler.head.rotation.x = -hop * 0.25;
   traveler.head.rotation.y = Math.sin(time * 0.37) * Math.sin(time * 0.23 + 1) * 0.7 * idle * (sheetState ? 0.2 : 1);
-  traveler.pack.position.y = 0.5 + Math.abs(Math.cos(player.phase)) * 0.025 * s;
+  traveler.pack.position.y = 0.58 + Math.abs(Math.cos(player.phase)) * 0.025 * s;
   traveler.pack.rotation.x = -0.08 * s;
   traveler.charm.rotation.z = Math.sin(player.phase) * 0.5 * s + Math.sin(time * 1.7) * 0.08;
 
@@ -1342,6 +1352,16 @@ function measure(dt, time) {
   else if (fps < 40) world.setQuality(1);
 }
 
+const focusPoint = new THREE.Vector3();
+
+// Keep the tilt-shift band on whatever the camera is about: the traveler, the open object, or the planet.
+function updateFocus() {
+  if (cam.mode === "focus" && objects[cam.focusId]) focusPoint.copy(objects[cam.focusId].dir).multiplyScalar(R + 0.4);
+  else if (cam.mode === "follow") focusPoint.copy(traveler.group.position).addScaledVector(player.dir, 0.5);
+  else focusPoint.set(0, 0, 0);
+  world.setFocus(THREE.MathUtils.clamp(focusPoint.project(camera).y * 0.5 + 0.5, 0.1, 0.9));
+}
+
 function frame() {
   const rawDt = clock.getDelta();
   const dt = Math.min(rawDt, 0.05);
@@ -1352,7 +1372,8 @@ function frame() {
   sound.tick(Number(life.answers.dashboard.play ?? 5) / 10);
   updatePlayer(dt, time);
   updateCamera(dt, time);
-  world.render(camera);
+  updateFocus();
+  world.render(camera, time);
   updateLabels();
   if (!started) {
     started = true;
