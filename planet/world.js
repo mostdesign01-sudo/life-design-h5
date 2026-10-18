@@ -535,7 +535,7 @@ function buildSpring(rand) {
   return { group: shadow(group), waterMat, glints };
 }
 
-function buildWorkshop(smokeTex) {
+function buildWorkshop() {
   const group = new THREE.Group();
   const plank = textured(woodTexture("#c99059", 3));
   const walls = new THREE.Mesh(new RoundedBoxGeometry(1.0, 0.7, 0.8, 2, 0.035), plank);
@@ -626,9 +626,11 @@ function buildWorkshop(smokeTex) {
   }
   addBlob(group, 0.85, 0.5);
   shadow(group);
+  // Smoke as soft rounded puffs that rise and swell, in the same rounded language as the trees.
   const puffs = [];
+  const puffGeo = new THREE.IcosahedronGeometry(0.11, 2);
   for (let i = 0; i < 28; i += 1) {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+    const sprite = new THREE.Mesh(puffGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0, depthWrite: false }));
     sprite.visible = false;
     group.add(sprite);
     puffs.push({ sprite, age: 0, life: 1, drift: new THREE.Vector2() });
@@ -1008,9 +1010,8 @@ export function createWorld(canvas) {
   const planet = buildPlanet();
   scene.add(planet.mesh);
 
-  const smokeTex = SOFT;
   const spring = buildSpring(rand);
-  const workshop = buildWorkshop(smokeTex);
+  const workshop = buildWorkshop();
   const lanterns = buildLanterns();
   const bench = buildBench();
   const vine = buildVine(rand);
@@ -1240,10 +1241,10 @@ export function createWorld(canvas) {
       p.sprite.position.y += dt * (0.35 + (1 - w) * 0.25);
       p.sprite.position.x += p.drift.x * dt;
       p.sprite.position.z += p.drift.y * dt;
-      const size = 0.16 + k * (0.55 + (1 - w) * 0.6);
+      const size = 0.7 + k * (1.6 + (1 - w) * 1.8);
       p.sprite.scale.set(size, size, size);
       p.sprite.material.color.copy(smokeLight).lerp(smokeDark, THREE.MathUtils.smoothstep(1 - w, 0.25, 0.8));
-      p.sprite.material.opacity = Math.sin(k * Math.PI) * (0.35 + (1 - w) * 0.6);
+      p.sprite.material.opacity = Math.min(1, Math.sin(k * Math.PI) * 1.5) * (0.55 + (1 - w) * 0.4);
     });
   }
 
@@ -1396,23 +1397,19 @@ export function createWorld(canvas) {
     post.render(cam, time);
   }
 
-  // Render one frame from `cam` into a square image (for the postcard), on a flat background
-  // instead of the sky dome, so the planet can sit in a clean round window.
-  function snapshot(cam, size, background) {
+  // Render one frame from `cam` into a square image (for the postcard): planet and sky dome only,
+  // without clouds or fog, so it can be faded softly into the card.
+  function snapshot(cam, size) {
     renderer.setPixelRatio(1);
     renderer.setSize(size, size, false);
     post.setSize(size, size, 1);
     post.setTiltShift(false);
-    sky.visible = false;
     clouds.group.visible = false;
-    const previous = scene.background;
-    scene.background = background;
+    sky.position.copy(cam.position);
     const fog = scene.fog;
     scene.fog = null;
     post.render(cam, 0);
     scene.fog = fog;
-    scene.background = previous;
-    sky.visible = true;
     clouds.group.visible = true;
     post.setTiltShift(tiltShift);
     const out = document.createElement("canvas");
@@ -1425,8 +1422,6 @@ export function createWorld(canvas) {
   return {
     renderer, scene, camera, sky, objects, farPlanets, blockers,
     setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust, celebrate, setDiaryReady, setNearCull,
-    // Postcard window colour: the horizon tone, which carries the play score.
-    skyTint: () => skyUniforms.uHorizon.value.clone(),
     setFocus: post.setFocus
   };
 }

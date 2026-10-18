@@ -180,7 +180,7 @@ function applyView(cameraToSet, aspect) {
 orbitDirection(cam.dir);
 // Intro framing: the planet sits in the upper part of the screen, clear of the title block below.
 const PORTRAIT = window.innerWidth < window.innerHeight;
-const INTRO_LOOK_Y = PORTRAIT ? -5.2 : -4.2;
+const INTRO_LOOK_Y = PORTRAIT ? -6 : -4.2;
 function introView() {
   return PORTRAIT ? viewHeightFor(22, 17) : 26;
 }
@@ -411,8 +411,12 @@ function openScore(id) {
   }, render());
 
   const range = document.getElementById("scoreInput");
+  // The filled part of the track shows the amount, not just a dot.
+  const paintTrack = () => range.style.setProperty("--fill", `${value * 10}%`);
+  paintTrack();
   range.addEventListener("input", () => {
     value = Number(range.value);
+    paintTrack();
     document.getElementById("scoreNum").textContent = value;
     syncWorld({ [scene.key]: value });
   });
@@ -744,9 +748,8 @@ function makePostcard() {
   shotCam.up.set(0, 1, 0);
   shotCam.lookAt(0, 0, 0);
   applyView(shotCam, 1);
-  // The window behind the planet carries the play score: warm when there was time for joy, grey when not.
-  const tint = world.skyTint().lerp(new THREE.Color("#fbf3e8"), 0.35);
-  const shot = world.snapshot(shotCam, W, tint);
+  // The sky behind the planet carries the play score: warm when there was time for joy, grey when not.
+  const shot = world.snapshot(shotCam, W);
 
   const card = document.createElement("canvas");
   card.width = W;
@@ -754,16 +757,18 @@ function makePostcard() {
   const ctx = card.getContext("2d");
   ctx.fillStyle = "#fbf3e8";
   ctx.fillRect(0, 0, W, H);
-  // The planet sits whole inside a round window, with a margin of card all around.
+  // The planet and its sky fade softly into the card instead of sitting in a hard-edged window.
+  const top = 270;
+  const size = 850;
+  const left = (W - size) / 2;
+  ctx.drawImage(shot, 0, 0, W, W, left, top, size, size);
   const cx = W / 2;
-  const cy = 700;
-  const radius = 400;
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.clip();
-  ctx.drawImage(shot, cx - radius * 1.06, cy - radius * 1.06, radius * 2.12, radius * 2.12);
-  ctx.restore();
+  const cy = top + size / 2;
+  const fade = ctx.createRadialGradient(cx, cy, size * 0.36, cx, cy, size * 0.52);
+  fade.addColorStop(0, "rgba(251,243,232,0)");
+  fade.addColorStop(1, "#fbf3e8");
+  ctx.fillStyle = fade;
+  ctx.fillRect(0, top - 10, W, size + 20);
 
   const font = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const serif = '"Planet Serif", "Songti SC", serif';
