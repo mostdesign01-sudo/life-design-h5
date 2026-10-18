@@ -1413,4 +1413,4 @@ function frame() {
 requestAnimationFrame(frame);
 
 // Testing hook: lets automated checks drive the scene without pointer gestures.
-window.__planet = { goTo, setOverview, setFollow, openObject, closeSheet, life: () => life, autoTarget: () => autoTarget, cam, player, world, makePostcard, orbitDirection, viewHeightFor };
+window.__planet = { goTo, setOverview, setFollow, openObject, closeSheet, life: () => life, autoTarget: () => autoTarget, cam, player, traveler, world, makePostcard, orbitDirection, viewHeightFor };

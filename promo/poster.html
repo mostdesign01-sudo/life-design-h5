@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>你的小星球 · 海报</title>
+<!-- 3:4 poster, laid out at 540×720 and captured at 2x. promo/poster.mjs renders the background and captures this page. -->
+<style>
+  @font-face { font-family: "Promo Serif"; src: url("./promo-serif-600.woff2") format("woff2"); font-weight: 600; }
+  html, body { margin: 0; background: #fbf3e8; }
+  .poster { position: relative; width: 540px; height: 720px; overflow: hidden; color: #2f3756; font-family: "Promo Serif", serif; }
+  .poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .copy { position: absolute; left: 44px; top: 64px; }
+  .kicker { display: flex; align-items: center; gap: 10px; font-family: -apple-system, "PingFang SC", "WenQuanYi Zen Hei", sans-serif; font-size: 17px; letter-spacing: 0.24em; color: #4f5570; }
+  .kicker::before { content: ""; width: 22px; height: 2px; background: #c95a26; }
+  h1 { margin: 22px 0 0; font-weight: 600; font-size: 46px; line-height: 1.3; letter-spacing: 0.08em; }
+  .line { margin-top: 18px; font-size: 17px; letter-spacing: 0.12em; color: #4f5570; }
+  .cta { position: absolute; left: 44px; bottom: 40px; color: #fbf3e8; text-shadow: 0 1px 8px rgba(20, 30, 15, 0.35); }
+  .cta b { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 24px; letter-spacing: 0.16em; }
+  .cta b i { font-style: normal; font-family: -apple-system, "PingFang SC", "WenQuanYi Zen Hei", sans-serif; font-weight: 400; font-size: 22px; letter-spacing: 0; }
+  .cta span { display: block; margin-top: 8px; font-family: -apple-system, "PingFang SC", "WenQuanYi Zen Hei", sans-serif; font-size: 17px; letter-spacing: 0.16em; opacity: 0.92; }
+</style>
+</head>
+<body>
+  <div class="poster">
+    <img id="bg" alt="">
+    <div class="copy">
+      <div class="kicker">设计人生 · 第一站</div>
+      <h1>你的人生，<br>是一颗小星球</h1>
+      <div class="line">多久没好好看一次晚霞了？</div>
+    </div>
+    <div class="cta"><b>测测你的小星球<i>→</i></b><span>约 3 分钟 · 6 个小站</span></div>
+  </div>
+  <script>
+    document.getElementById("bg").src = new URLSearchParams(location.search).get("bg") || "";
+  </script>
+</body>
+</html>
