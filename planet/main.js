@@ -102,6 +102,8 @@ const { scene, camera, objects, farPlanets } = world;
 const traveler = buildTraveler();
 scene.add(traveler.group);
 const sound = createSound();
+// Start fetching the display face early; the postcard canvas draws with it.
+document.fonts?.load('600 32px "Planet Serif"');
 // Traveler reactions, as the clock time each one started.
 const react = { hop: -10, land: -10, glance: 0 };
 let clockNow = 0;
@@ -756,15 +758,23 @@ function makePostcard() {
   ctx.restore();
 
   const font = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  const serif = '"Planet Serif", "Songti SC", serif';
+  // Canvas letter-spacing where supported; older browsers simply draw without it.
+  const track = value => { if ("letterSpacing" in ctx) ctx.letterSpacing = value; };
   const date = new Date();
+  ctx.fillStyle = "#c95a26";
+  ctx.fillRect(72, 92, 28, 3);
   ctx.fillStyle = "#4f5570";
-  ctx.font = `500 28px ${font}`;
-  ctx.fillText(`星球 ${planet.code} · ${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`, 72, 104);
+  ctx.font = `500 24px ${font}`;
+  track("4px");
+  ctx.fillText(`星球 ${planet.code} · ${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`, 114, 102);
   const [line1, line2] = cardTitle();
   ctx.fillStyle = "#2f3756";
-  ctx.font = `800 64px ${font}`;
+  ctx.font = `600 62px ${serif}`;
+  track("3px");
   ctx.fillText(line1, 72, 196);
-  ctx.fillText(line2, 72, 278);
+  ctx.fillText(line2, 72, 276);
+  track("0px");
 
   const d = life.answers.dashboard;
   const cardIcons = { health: "泉水", work: "工坊", play: "晚霞", love: "双生灯" };
@@ -774,24 +784,30 @@ function makePostcard() {
     const color = CARD_COLORS[item.key];
     drawIcon(ctx, item.key, x + 30, 1172, 48, color);
     ctx.fillStyle = "#2f3756";
-    ctx.font = `800 52px ${font}`;
+    ctx.font = `600 54px ${serif}`;
     ctx.fillText(String(score), x + 76, 1192);
     ctx.fillStyle = "#4f5570";
-    ctx.font = `500 26px ${font}`;
+    ctx.font = `500 24px ${font}`;
+    track("3px");
     ctx.fillText(`${item.label} · ${cardIcons[item.key]}`, x, 1240);
+    track("0px");
   });
 
   if (life.problem) {
     const old = Math.round(life.problem.gravity / 10);
     ctx.fillStyle = "#2f3756";
-    ctx.font = `600 30px ${font}`;
+    ctx.font = `600 30px ${serif}`;
+    track("2px");
     ctx.fillText(`缠绕藤里，${10 - old} 成是可以动手的新芽`, 72, 1298);
+    track("0px");
   }
   ctx.fillStyle = "#e8ddd0";
   ctx.fillRect(72, 1326, W - 144, 2);
   ctx.fillStyle = "#2f3756";
-  ctx.font = `700 30px ${font}`;
+  ctx.font = `600 30px ${serif}`;
+  track("4px");
   ctx.fillText("测测你的小星球", 72, 1376);
+  track("0px");
   ctx.fillStyle = "#4f5570";
   ctx.font = `400 26px ${font}`;
   ctx.fillText(SHARE_HOST, 72, 1414);

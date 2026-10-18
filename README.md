@@ -47,6 +47,8 @@
 
 技术上是纯静态的 Three.js（`vendor/three.module.min.js` 及 `vendor/three-addons/` 里的后期处理模块，r160，MIT），无构建、不依赖 CDN。画面走几何设计风：正交视角、三阶平涂明暗、低饱和马卡龙配色，物件都是方块、圆柱、圆锥拼成的小建筑，背景是一张平面插画（渐变天空、太阳和纸片云），只叠加轻微的泛光和暗角。所有模型都是代码生成的。代码在 [`planet/`](planet/)：`world.js` 搭场景，`look.js` 负责后期与背景插画，`main.js` 管镜头、操作和对话，`state.js` 负责和问卷共用进度。
 
+排版用两种字体：标题、名称和数字用思源宋体子集（`vendor/fonts/`，SIL OFL，约 100KB，只含页面用到的字），正文用系统黑体。改了页面上的中文文案后，用 `scripts/subset-font.py` 重新生成字体子集。完整的视觉、排版、动效和检查流程写在项目 skill [`.claude/skills/planet-design/SKILL.md`](.claude/skills/planet-design/SKILL.md) 里，做新星球时按它来。
+
 页面会在开场几秒测帧率，较慢的手机自动降低分辨率、关掉泛光。也可以在地址后加 `?quality=0`、`1` 或 `2` 手动指定画质。
 
 ## 记录与隐私
