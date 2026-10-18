@@ -9,18 +9,20 @@
   <style>
     :root {
       --ink: #231d2b;
-      --muted: rgba(35, 29, 43, 0.62);
+      --muted: rgba(35, 29, 43, 0.74);
       --paper: rgba(255, 251, 244, 0.94);
       --paper-solid: #fffbf4;
       --line: rgba(35, 29, 43, 0.12);
-      --accent: #e8743b;
-      --accent-dark: #c4561f;
+      --accent: #c95a26;
+      --accent-dark: #a9471a;
       --warn: #e0475a;
       --teal: #1f9c8c;
       --gold: #f2b84b;
       --night: #141c44;
       --radius: 16px;
       --safe-top: env(safe-area-inset-top, 0px);
+      /* Space the host app's own top controls occupy; set to 76px when embedded (?host=xhs). */
+      --chrome-top: 0px;
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
 
@@ -50,7 +52,7 @@
 
     .hud-top {
       position: fixed;
-      top: calc(var(--safe-top) + 12px);
+      top: calc(max(var(--safe-top), var(--chrome-top)) + 12px);
       left: 12px;
       right: 12px;
       display: flex;
@@ -146,6 +148,7 @@
       box-shadow: 0 8px 24px rgba(20, 10, 40, 0.25);
       white-space: nowrap;
       text-decoration: none;
+      color: var(--ink);
       display: inline-flex;
       align-items: center;
       pointer-events: auto;
@@ -168,7 +171,14 @@
       transition: opacity 0.2s;
     }
 
+    .obj-label small { display: block; font-size: 10px; font-weight: 500; color: rgba(35, 29, 43, 0.62); text-align: center; margin-top: 1px; }
     .obj-label.is-done::after { content: " ✓"; color: var(--teal); }
+    /* The next unvisited stop breathes, so a first-time visitor knows where to go. */
+    .obj-label.is-next { background: #fff; box-shadow: 0 0 0 0 rgba(201, 90, 38, 0.55); animation: nextPulse 1.8s ease-out infinite; }
+    @keyframes nextPulse {
+      0% { box-shadow: 0 0 0 0 rgba(201, 90, 38, 0.5), 0 4px 14px rgba(20, 10, 40, 0.2); }
+      100% { box-shadow: 0 0 0 12px rgba(201, 90, 38, 0), 0 4px 14px rgba(20, 10, 40, 0.2); }
+    }
     .obj-label.is-far { background: rgba(30, 20, 50, 0.55); color: #f4e9ff; font-weight: 500; }
 
     .interact-btn {
@@ -258,9 +268,27 @@
 
     .sheet.is-open { transform: translate(-50%, 0); }
 
+    /* Sheet content enters line by line: each block rises in a beat after the one above. */
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: none; }
+    }
+    .sheet.is-open #sheetBody > * { animation: rise 0.45s both cubic-bezier(.2,.8,.2,1); }
+    .sheet.is-open #sheetBody > :nth-child(1) { animation-delay: 0.08s; }
+    .sheet.is-open #sheetBody > :nth-child(2) { animation-delay: 0.14s; }
+    .sheet.is-open #sheetBody > :nth-child(3) { animation-delay: 0.2s; }
+    .sheet.is-open #sheetBody > :nth-child(4) { animation-delay: 0.26s; }
+    .sheet.is-open #sheetBody > :nth-child(5) { animation-delay: 0.32s; }
+    .sheet.is-open #sheetBody > :nth-child(n+6) { animation-delay: 0.38s; }
+    @media (prefers-reduced-motion: reduce) {
+      .sheet.is-open #sheetBody > *, .intro h1, .intro p, .intro .btn-primary { animation: none; }
+    }
+
     .sheet-grip { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: -6px auto 12px; }
     .sheet-kicker { font-size: 12px; font-weight: 700; color: var(--accent-dark); letter-spacing: 0.04em; }
-    .sheet-title { font-size: 19px; line-height: 1.4; margin: 6px 0 8px; }
+    .sheet-title { font-size: 19px; line-height: 1.4; margin: 6px 0 8px; text-wrap: balance; }
+    .sheet p, .reaction { text-wrap: pretty; }
+    .sheet-actions.is-sticky { position: sticky; bottom: calc(-1 * (var(--safe-bottom) + 18px)); background: var(--paper-solid); padding: 12px 0 calc(var(--safe-bottom) + 18px); margin-bottom: calc(-1 * (var(--safe-bottom) + 18px)); z-index: 1; }
     .sheet-story { font-size: 14px; line-height: 1.75; color: var(--muted); margin: 0 0 14px; }
     .sheet-question { font-size: 15px; font-weight: 600; line-height: 1.6; margin: 0 0 12px; }
 
@@ -268,9 +296,15 @@
 
     .score-row input[type="range"] {
       flex: 1;
-      accent-color: var(--accent);
       height: 36px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
     }
+    .score-row input[type="range"]::-webkit-slider-runnable-track { height: 8px; border-radius: 8px; background: #eadfd1; }
+    .score-row input[type="range"]::-moz-range-track { height: 8px; border-radius: 8px; background: #eadfd1; }
+    .score-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: -9px; border-radius: 50%; background: var(--accent); border: 4px solid #fff; box-shadow: 0 2px 8px rgba(35, 29, 43, 0.25); }
+    .score-row input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 4px solid #fff; box-shadow: 0 2px 8px rgba(35, 29, 43, 0.25); }
 
     .score-num {
       min-width: 54px;
@@ -363,26 +397,27 @@
       justify-content: flex-end;
       padding: 24px 20px calc(var(--safe-bottom) + 40px);
       text-align: center;
-      color: #fff;
-      background: linear-gradient(180deg, rgba(29, 21, 48, 0) 40%, rgba(29, 21, 48, 0.75) 100%);
+      color: #3f4b73;
+      background: linear-gradient(180deg, rgba(255, 246, 238, 0) 50%, rgba(255, 246, 238, 0.96) 66%, #fff6ee 100%);
       transition: opacity 0.6s;
     }
 
     .intro.is-hidden { opacity: 0; pointer-events: none; }
-    .intro h1 { font-size: 30px; margin: 0 0 8px; letter-spacing: 0.06em; text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); }
-    .intro p { margin: 0 0 22px; line-height: 1.8; font-size: 14px; max-width: 360px; opacity: 0.92; }
+    .intro h1 { font-size: 30px; margin: 0 0 8px; letter-spacing: 0.12em; font-weight: 800; animation: rise 0.7s 0.5s both cubic-bezier(.2,.8,.2,1); }
+    .intro p { margin: 0 0 22px; line-height: 1.8; font-size: 14px; max-width: 360px; color: #4d5778; animation: rise 0.7s 0.65s both cubic-bezier(.2,.8,.2,1); }
+    .intro .btn-primary { animation: rise 0.7s 0.8s both cubic-bezier(.2,.8,.2,1); }
     .intro .btn-primary { flex: none; min-width: 180px; min-height: 52px; font-size: 16px; border-radius: 999px; }
-    .intro small { margin-top: 14px; font-size: 12px; opacity: 0.7; line-height: 1.6; max-width: 360px; }
+    .intro small { margin-top: 14px; font-size: 12px; color: #5d6584; line-height: 1.6; max-width: 360px; }
 
     .loading {
       position: fixed;
       inset: 0;
       display: grid;
       place-items: center;
-      color: #f4e9ff;
+      color: #3f4b73;
       font-size: 14px;
       z-index: 11;
-      background: var(--night);
+      background: linear-gradient(180deg, #f8d6c3, #a9c6ea);
       transition: opacity 0.5s;
     }
 
@@ -391,7 +426,7 @@
     .toast {
       position: fixed;
       left: 50%;
-      top: calc(var(--safe-top) + 70px);
+      top: calc(max(var(--safe-top), var(--chrome-top)) + 70px);
       transform: translate(-50%, -10px);
       background: rgba(30, 20, 50, 0.85);
       color: #fff;
@@ -428,12 +463,13 @@
       <ul class="quest-list" id="questList"></ul>
     </div>
     <div class="hud-actions">
-      <button class="icon-btn" id="overviewBtn" type="button">俯瞰</button>
+      <button class="icon-btn" id="soundBtn" type="button" aria-pressed="true">声音 开</button>
+      <button class="icon-btn" id="overviewBtn" type="button">看全貌</button>
       <a class="icon-btn hide-sm" href="./index.html">完整问卷</a>
     </div>
   </div>
 
-  <div class="hint" id="hint" style="opacity:0">拖动左侧移动 · 拖动右侧转视角 · 点物件走过去</div>
+  <div class="hint" id="hint" style="opacity:0">点一下发光的地名，旅人会自己走过去</div>
   <button class="interact-btn" id="interactBtn" type="button" hidden>查看</button>
   <div class="joystick" id="joystick"><div class="joystick-knob" id="joystickKnob"></div></div>
 
@@ -445,9 +481,9 @@
 
   <div class="intro" id="intro">
     <h1>你的小星球</h1>
-    <p>每个人都住在一颗小星球上。泉水、工坊、晚霞和双生灯，<br>分别是你的健康、工作、娱乐和爱。<br>走一圈，看看你的星球现在是什么样子。</p>
+    <p>泉水、工坊、晚霞、双生灯，<br>是你的健康、工作、娱乐和爱。<br>缠绕藤是此刻的困扰，<br>走完一圈，日记会把它们画成一张明信片。</p>
     <button class="btn btn-primary" id="startBtn" type="button">降落</button>
-    <small>设计人生蓝图 · 3D 第一站。回答保存在本机浏览器，会和完整问卷共用进度。</small>
+    <small>约 3 分钟 · 6 个小站</small>
   </div>
 
   <div class="loading" id="loading">正在靠近你的星球…</div>

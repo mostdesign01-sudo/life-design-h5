@@ -4,6 +4,7 @@ import {
   loadLifeState, saveLifeState, loadPlanetState, savePlanetState,
   markCompleted, classifyProblem, requestCoreProblemCoach, dashboardItems
 } from "./state.js";
+import { createSound } from "./sound.js";
 
 const SCORE_SCENES = {
   spring: {
@@ -67,6 +68,8 @@ const QUESTS = [
 
 const SCORE_IDS = ["spring", "workshop", "bench", "lanterns"];
 const FULL_URL = "./index.html";
+// Shown on the postcard so a viewer can find the planet; the path without protocol reads cleaner.
+const SHARE_HOST = `${location.host}${location.pathname}`.replace(/\/$/, "");
 
 const els = {
   canvas: document.getElementById("scene"),
@@ -77,6 +80,7 @@ const els = {
   questTitle: document.getElementById("questTitle"),
   questCount: document.getElementById("questCount"),
   overviewBtn: document.getElementById("overviewBtn"),
+  soundBtn: document.getElementById("soundBtn"),
   hint: document.getElementById("hint"),
   interactBtn: document.getElementById("interactBtn"),
   joystick: document.getElementById("joystick"),
@@ -97,6 +101,10 @@ const world = createWorld(els.canvas);
 const { scene, camera, objects, farPlanets } = world;
 const traveler = buildTraveler();
 scene.add(traveler.group);
+const sound = createSound();
+// Traveler reactions, as the clock time each one started.
+const react = { hop: -10, land: -10, glance: 0 };
+let clockNow = 0;
 
 const tmpV = new THREE.Vector3();
 const tmpQ = new THREE.Quaternion();
@@ -164,6 +172,14 @@ function applyView(cameraToSet, height, aspect) {
 }
 
 orbitDirection(cam.dir);
+// Intro framing: the planet sits in the upper part of the screen, clear of the title block below.
+const INTRO_LOOK_Y = -5.2;
+function introView() {
+  return viewHeightFor(22, 17);
+}
+// Start exactly on the intro framing so the very first frame is already a finished picture.
+cam.look.set(0, INTRO_LOOK_Y, 0);
+cam.view = introView();
 
 const input = { x: 0, y: 0, keys: new Set() };
 let autoTarget = null;
@@ -214,7 +230,11 @@ function renderQuests() {
       </button>
     </li>
   `).join("");
-  labelEls.forEach(label => label.el.classList.toggle("is-done", !label.far && isDone(label.id)));
+  const next = nextQuest();
+  labelEls.forEach(label => {
+    label.el.classList.toggle("is-done", !label.far && isDone(label.id));
+    label.el.classList.toggle("is-next", !label.far && label.id === next?.id);
+  });
 }
 
 els.questHead.addEventListener("click", () => {
@@ -233,12 +253,17 @@ if (window.innerWidth < 520) {
 }
 
 const labelEls = [
-  ...QUESTS.map(q => ({ id: q.id, text: q.name, far: false })),
+  ...QUESTS.map(q => ({ id: q.id, text: q.name, sub: q.sub, far: false })),
   ...farPlanets.map(p => ({ id: p.id, text: `${p.name} · 筹建中`, far: true }))
 ].map(item => {
   const el = document.createElement("div");
   el.className = `obj-label${item.far ? " is-far" : ""}`;
   el.textContent = item.text;
+  if (item.sub) {
+    const sub = document.createElement("small");
+    sub.textContent = item.sub;
+    el.appendChild(sub);
+  }
   els.labels.appendChild(el);
   return { ...item, el };
 });
@@ -275,6 +300,7 @@ function openSheet(state, html) {
   player.standTime = 2.5;
   player.lookTarget = objects[state.focusId]?.dir || null;
   els.sheetBody.innerHTML = html;
+  if (!els.sheet.classList.contains("is-open")) sound.open();
   els.sheet.classList.add("is-open");
   els.sheetBackdrop.classList.add("is-open");
   els.interactBtn.hidden = true;
@@ -348,6 +374,7 @@ function openScore(id) {
         if (!planet.visited.includes(id)) planet.visited.push(id);
         persist();
         syncWorld();
+        celebrate(id, value);
         const extra = id === "bench" ? `今天的晚霞指数：${glowIndex(value)}%` : "";
         els.sheetBody.innerHTML = `
           <div class="sheet-kicker">${scene.kicker} · ${value} 分</div>
@@ -398,9 +425,8 @@ function coachHTML(coach) {
   if (coach.status === "loading") {
     return `<div class="coach"><span class="coach-label">AI 关键追问</span><p>AI 正在做一次短判断：一个关键观察、一个追问和一个低成本原型动作。</p></div>`;
   }
-  if (coach.status === "error") {
-    return `<div class="coach"><span class="coach-label">AI 关键追问</span><p>${escapeHTML(coach.error || "这次 AI 追问暂时不可用。")}</p></div>`;
-  }
+  // When the AI can't be reached, leave it out: the fixed feedback above stands on its own.
+  if (coach.status === "error") return "";
   const c = coach.result || {};
   return `
     <div class="coach">
@@ -415,12 +441,8 @@ function coachHTML(coach) {
 }
 
 function radarHTML(p) {
-  return `
-    <div class="radar">
-      <div class="radar-row"><span>重力问题</span><div class="radar-bar"><span style="width:${p.gravity}%;background:#8c6a50"></span></div><span>${p.gravity}%</span></div>
-      <div class="radar-row"><span>可设计</span><div class="radar-bar"><span style="width:${p.designable}%;background:#2fbfa0"></span></div><span>${p.designable}%</span></div>
-    </div>
-  `;
+  const old = Math.round(p.gravity / 10);
+  return `<p class="sheet-question" style="font-weight:500">这团藤里，大约 <strong>${old} 成</strong>是拔不动的老藤，<strong>${10 - old} 成</strong>是可以动手的新芽。</p>`;
 }
 
 function openProblem() {
@@ -439,6 +461,7 @@ function openProblem() {
         markCompleted(life, "coreProblem");
         persist();
         syncWorld();
+        celebrate("vine", 7);
         showProblemResult(true);
       }
     }
@@ -539,6 +562,7 @@ function openDiary() {
         life.answers.dashboard.note = note;
         markCompleted(life, "dashboard");
         persist();
+        celebrate("sign", 9);
         showPostcard();
       }
     }
@@ -571,10 +595,10 @@ function showPostcard() {
     <h2 class="sheet-title" id="sheetTitle">这是你的星球，现在的样子。</h2>
     <div class="postcard-wrap"><img src="${url}" alt="我的小星球明信片"></div>
     <p class="sheet-story" style="margin-top:10px">手机上可以长按图片保存。它不是判决，只是这一季的快照：过一阵再来，星球会因为你做的小事而变。</p>
-    <div class="sheet-actions">
-      <a class="btn btn-ghost" href="${url}" download="我的小星球.png">保存明信片</a>
+    <div class="sheet-actions is-sticky">
+      <a class="btn btn-primary" href="${url}" download="我的小星球.png">保存明信片</a>
       <button class="btn btn-ghost" type="button" data-action="edit">改写日记</button>
-      <a class="btn btn-primary" href="${FULL_URL}">继续旅程</a>
+      <a class="btn btn-ghost" href="${FULL_URL}">继续旅程</a>
     </div>
     <ul class="next-planets">
       ${NEXT_PLANETS.map(([name, sub]) => `<li><span>${name}</span><span>${sub} · 筹建中</span></li>`).join("")}
@@ -629,77 +653,157 @@ function goTo(id) {
 
 // ---------- postcard ----------
 
+// One phrase per dashboard item for its best and worst state; the postcard title pairs the brightest
+// spot with the one still waiting, so every card reads differently.
+const CARD_PHRASES = {
+  health: ["泉水还有点浑", "泉水很清"],
+  work: ["工坊还在冒烟", "工坊很安静"],
+  play: ["晚霞还在路上", "晚霞铺满了天"],
+  love: ["灯串还没全亮", "灯串亮到了对面"]
+};
+
+function cardTitle() {
+  const sorted = sortedScores();
+  const high = sorted[sorted.length - 1];
+  const low = sorted[0];
+  if (high.score - low.score < 2) return high.score >= 6 ? ["每一处", "都在好好亮着"] : ["星球在慢慢", "攒着力气"];
+  return [`${CARD_PHRASES[high.key][1]}，`, CARD_PHRASES[low.key][0]];
+}
+
+// Small flat icons drawn in the planet's palette, one per dashboard item.
+function drawIcon(ctx, key, x, y, s, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = s * 0.08;
+  if (key === "health") {
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.5);
+    ctx.bezierCurveTo(s * 0.45, 0, s * 0.35, s * 0.45, 0, s * 0.45);
+    ctx.bezierCurveTo(-s * 0.35, s * 0.45, -s * 0.45, 0, 0, -s * 0.5);
+    ctx.fill();
+  } else if (key === "work") {
+    ctx.fillRect(-s * 0.36, -s * 0.05, s * 0.72, s * 0.5);
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.46, -s * 0.03);
+    ctx.lineTo(0, -s * 0.45);
+    ctx.lineTo(s * 0.46, -s * 0.03);
+    ctx.fill();
+  } else if (key === "play") {
+    ctx.beginPath();
+    ctx.arc(0, s * 0.2, s * 0.38, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(-s * 0.5, s * 0.26, s, s * 0.08);
+  } else {
+    [-1, 1].forEach(side => {
+      ctx.fillRect(side * s * 0.34 - s * 0.05, -s * 0.4, s * 0.1, s * 0.85);
+      ctx.beginPath();
+      ctx.arc(side * s * 0.2, -s * 0.28, s * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.2, -s * 0.2);
+    ctx.quadraticCurveTo(0, s * 0.05, s * 0.2, -s * 0.2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+const CARD_COLORS = { health: "#3f9e9a", work: "#d0643f", play: "#c9902e", love: "#c95f7a" };
+
 function makePostcard() {
-  const size = 1080;
+  const W = 1080;
+  const H = 1440;
   const shotCam = camera.clone();
   shotCam.clearViewOffset();
-  // Same isometric view as the intro, with the planet sitting a little low to leave room for the title.
-  const yaw = Math.atan2(POLE.x, POLE.z) - 0.5;
-  const pitch = 0.5;
-  shotCam.position.set(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)).multiplyScalar(CAM_DISTANCE);
+  // Three-quarter view of the lived-in side, close enough that the buildings read at thumbnail size.
+  const side = new THREE.Vector3().crossVectors(POLE, SUN).normalize();
+  const view = POLE.clone().multiplyScalar(0.62).addScaledVector(SUN, 0.62).addScaledVector(side, 0.3).normalize();
+  shotCam.position.copy(view).multiplyScalar(CAM_DISTANCE);
   shotCam.up.set(0, 1, 0);
-  shotCam.lookAt(0, 1.6, 0);
-  applyView(shotCam, 17.5, 1);
+  shotCam.lookAt(POLE.clone().multiplyScalar(R * 0.62));
+  applyView(shotCam, 11, 1);
+  const shot = world.snapshot(shotCam, W);
 
-  const shot = world.snapshot(shotCam, size);
   const card = document.createElement("canvas");
-  card.width = size;
-  card.height = 1480;
+  card.width = W;
+  card.height = H;
   const ctx = card.getContext("2d");
-  ctx.drawImage(shot, 0, 0, size, size);
+  ctx.fillStyle = "#fbf3e8";
+  ctx.fillRect(0, 0, W, H);
+  // Crop the square render to a band between the title and the scores, softened at both edges.
+  ctx.drawImage(shot, 0, 150, W, 800, 0, 320, W, 800);
+  const fadeTop = ctx.createLinearGradient(0, 320, 0, 430);
+  fadeTop.addColorStop(0, "#fbf3e8");
+  fadeTop.addColorStop(1, "rgba(251,243,232,0)");
+  ctx.fillStyle = fadeTop;
+  ctx.fillRect(0, 320, W, 110);
+  const fadeBottom = ctx.createLinearGradient(0, 1020, 0, 1120);
+  fadeBottom.addColorStop(0, "rgba(251,243,232,0)");
+  fadeBottom.addColorStop(1, "#fbf3e8");
+  ctx.fillStyle = fadeBottom;
+  ctx.fillRect(0, 1020, W, 100);
 
   const font = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-  const shade = ctx.createLinearGradient(0, 0, 0, 260);
-  shade.addColorStop(0, "rgba(29,21,48,0.55)");
-  shade.addColorStop(1, "rgba(29,21,48,0)");
-  ctx.fillStyle = shade;
-  ctx.fillRect(0, 0, size, 260);
-  ctx.fillStyle = "#fff";
-  ctx.font = `700 68px ${font}`;
-  ctx.fillText("我的小星球", 64, 120);
-  ctx.font = `400 30px ${font}`;
   const date = new Date();
-  ctx.fillText(`${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")} · 星球 ${planet.code} · 晚霞指数 ${glowIndex(Number(life.answers.dashboard.play ?? 5))}%`, 66, 172);
+  ctx.fillStyle = "#6b6f86";
+  ctx.font = `500 28px ${font}`;
+  ctx.fillText(`星球 ${planet.code} · ${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`, 72, 104);
+  const [line1, line2] = cardTitle();
+  ctx.fillStyle = "#2f3756";
+  ctx.font = `800 64px ${font}`;
+  ctx.fillText(line1, 72, 196);
+  ctx.fillText(line2, 72, 278);
 
-  ctx.fillStyle = "#fffbf4";
-  ctx.fillRect(0, size, size, 1480 - size);
   const d = life.answers.dashboard;
-  const icons = { health: "泉水", work: "工坊", play: "晚霞", love: "双生灯" };
+  const cardIcons = { health: "泉水", work: "工坊", play: "晚霞", love: "双生灯" };
   dashboardItems.forEach((item, i) => {
-    const x = 64 + i * 245;
+    const cx = 72 + i * 240;
     const score = Number(d[item.key] ?? 5);
-    ctx.fillStyle = "rgba(35,29,43,0.6)";
-    ctx.font = `500 28px ${font}`;
-    ctx.fillText(`${item.label} · ${icons[item.key]}`, x, size + 74);
-    ctx.fillStyle = item.color;
-    ctx.font = `800 64px ${font}`;
-    ctx.fillText(String(score), x, size + 146);
-    ctx.fillStyle = "rgba(35,29,43,0.08)";
-    ctx.fillRect(x, size + 166, 200, 10);
-    ctx.fillStyle = item.color;
-    ctx.fillRect(x, size + 166, 20 * score, 10);
+    const color = CARD_COLORS[item.key];
+    drawIcon(ctx, item.key, cx + 30, 1172, 48, color);
+    ctx.fillStyle = "#2f3756";
+    ctx.font = `800 52px ${font}`;
+    ctx.fillText(String(score), cx + 76, 1192);
+    ctx.fillStyle = "#5d6380";
+    ctx.font = `500 26px ${font}`;
+    ctx.fillText(`${item.label} · ${cardIcons[item.key]}`, cx, 1252);
   });
-  ctx.fillStyle = "#231d2b";
-  ctx.font = `500 30px ${font}`;
-  const low = sortedScores()[0];
-  const note = (d.note || "").replace(/\s+/g, " ");
-  const clip = (text, n) => (text.length > n ? `${text.slice(0, n)}…` : text);
-  ctx.fillText(clip(`红灯：${low.label}${note ? ` —— ${note}` : ""}`, 32), 64, size + 248);
-  if (life.problem) {
-    ctx.fillStyle = "rgba(35,29,43,0.7)";
-    ctx.fillText(`缠绕藤：重力 ${life.problem.gravity}% · 可设计 ${life.problem.designable}%`, 64, size + 298);
-  }
-  ctx.fillStyle = "rgba(35,29,43,0.45)";
-  ctx.font = `400 24px ${font}`;
-  ctx.fillText("设计人生蓝图 · 3D 第一站", 64, 1480 - 40);
+
+  ctx.fillStyle = "#e8ddd0";
+  ctx.fillRect(72, 1300, W - 144, 2);
+  ctx.fillStyle = "#2f3756";
+  ctx.font = `700 32px ${font}`;
+  ctx.fillText("测测你的小星球", 72, 1370);
+  ctx.fillStyle = "#5d6380";
+  ctx.font = `400 26px ${font}`;
+  ctx.fillText(SHARE_HOST, 72, 1410);
   return card.toDataURL("image/png");
+}
+
+// Every confirmed answer gets a visible and audible result on its object, and the traveler hops.
+function celebrate(id, score) {
+  world.celebrate(id);
+  react.hop = clockNow;
+  if (id === "lanterns") sound.bulbs(Math.round(score * 0.9));
+  else if (id === "workshop") sound.puff();
+  else if (id === "vine") sound.sparkle();
+  sound.confirm(score);
 }
 
 // ---------- camera modes ----------
 
 function setFollow() {
+  if (cam.mode === "intro") {
+    // Landing: hold wide for a beat, then dive, and squash the traveler on touchdown.
+    cam.dive = clockNow;
+    react.land = clockNow + 1.15;
+    sound.whoosh();
+    setTimeout(() => sound.land(), 1150);
+  }
   cam.mode = "follow";
-  els.overviewBtn.textContent = "俯瞰";
+  els.overviewBtn.textContent = "看全貌";
   els.intro.classList.add("is-hidden");
 }
 
@@ -713,12 +817,29 @@ function setOverview() {
   els.overviewBtn.textContent = "回到地面";
 }
 
+function renderSoundButton() {
+  els.soundBtn.textContent = sound.muted ? "声音 关" : "声音 开";
+  els.soundBtn.setAttribute("aria-pressed", String(!sound.muted));
+}
+
+els.soundBtn.addEventListener("click", () => {
+  sound.start();
+  sound.toggleMute();
+  renderSoundButton();
+});
+renderSoundButton();
+
+if (new URLSearchParams(location.search).get("host") === "xhs") {
+  document.documentElement.style.setProperty("--chrome-top", "76px");
+}
+
 els.overviewBtn.addEventListener("click", () => {
   if (cam.mode === "overview") setFollow();
   else setOverview();
 });
 
 els.startBtn.addEventListener("click", () => {
+  sound.start();
   setFollow();
   els.hint.style.opacity = "1";
   setTimeout(() => { els.hint.style.opacity = "0"; }, 7000);
@@ -734,9 +855,9 @@ function updateCamera(dt, time) {
   if (cam.mode === "intro" || cam.mode === "overview") {
     if (cam.mode === "intro") orbit.yaw += dt * 0.05;
     orbitDirection(desired.dir);
-    desired.look.set(0, cam.mode === "intro" ? -1.6 : 0, 0);
+    desired.look.set(0, cam.mode === "intro" ? INTRO_LOOK_Y : 0, 0);
     desired.up.set(0, 1, 0);
-    desired.view = viewHeightFor(17 * orbit.scale, 15 * orbit.scale);
+    desired.view = cam.mode === "intro" ? introView() : viewHeightFor(17 * orbit.scale, 15 * orbit.scale);
   } else if (cam.mode === "focus" && objects[cam.focusId]) {
     const obj = objects[cam.focusId];
     const od = obj.dir;
@@ -755,14 +876,27 @@ function updateCamera(dt, time) {
     desired.dir.copy(od).multiplyScalar(Math.sin(ELEVATION)).addScaledVector(away, Math.cos(ELEVATION));
     desired.look.copy(objPos).addScaledVector(od, 0.5 * obj.focus);
     desired.up.copy(od);
-    desired.view = viewHeightFor(3.6 * obj.focus, 3.4 * obj.focus);
+    // Fit the object into the part of the screen the sheet leaves free.
+    const free = THREE.MathUtils.clamp(1 - (sheetState ? els.sheet.offsetHeight : 0) / window.innerHeight, 0.45, 1);
+    desired.view = viewHeightFor(3.6 * obj.focus, 3.4 * obj.focus) * (0.35 + 0.65 * free);
+    const punch = (time - react.hop) / 0.6;
+    if (punch > 0 && punch < 1) desired.view *= 1 - Math.sin(punch * Math.PI) * 0.08;
   } else {
     desired.dir.copy(up).multiplyScalar(Math.sin(ELEVATION)).addScaledVector(camForward, -Math.cos(ELEVATION));
     desired.look.copy(base).addScaledVector(up, 0.5).addScaledVector(camForward, 0.6);
     desired.up.copy(up);
     desired.view = viewHeightFor(6.5 * cam.zoom, 4.2 * cam.zoom);
   }
-  const k = 1 - Math.exp(-dt * (cam.mode === "follow" ? 7 : 3));
+  // Dive: a short anticipation (the wide view eases out a little), then a slower, smooth descent.
+  const diveT = time - (cam.dive ?? -10);
+  if (diveT < 0.3) {
+    orbitDirection(desired.dir);
+    desired.look.set(0, INTRO_LOOK_Y, 0);
+    desired.up.set(0, 1, 0);
+    desired.view = introView() * 1.06;
+  }
+  const rate = diveT < 1.6 ? 2.6 : cam.mode === "follow" ? 7 : 3;
+  const k = 1 - Math.exp(-dt * rate);
   cam.dir.lerp(desired.dir, k).normalize();
   cam.look.lerp(desired.look, k);
   cam.up.lerp(desired.up, k).normalize();
@@ -883,14 +1017,26 @@ function updatePlayer(dt, time) {
   player.phase += dt * (3 + player.speed * 3.2);
   if (s > 0.4 && Math.sign(prevStep) !== Math.sign(Math.sin(player.phase))) {
     world.kickDust(traveler.group.position, player.dir);
+    sound.step();
   }
   const swing = Math.sin(player.phase) * 0.75 * s;
   traveler.legs[0].rotation.x = swing;
   traveler.legs[1].rotation.x = -swing;
   traveler.arms[0].rotation.x = -swing * 0.7;
   traveler.arms[1].rotation.x = swing * 0.7;
-  traveler.body.position.y = Math.abs(Math.sin(player.phase)) * 0.04 * s + Math.sin(time * 2) * 0.008;
-  traveler.head.rotation.z = Math.sin(time * 1.3) * 0.04 * (1 - s);
+  const idle = 1 - s;
+  // Hop on a confirmed answer; squash on landing from the dive; breathe and glance around when idle.
+  const hopT = (time - react.hop) / 0.45;
+  const hop = hopT > 0 && hopT < 1 ? Math.sin(hopT * Math.PI) : 0;
+  const landT = time - react.land;
+  const landSquash = landT > 0 && landT < 0.9 ? Math.sin(landT * 16) * Math.exp(-landT * 6) * 0.22 : 0;
+  const breathe = Math.sin(time * 2.1) * 0.018 * idle;
+  const sy = 1 - landSquash + breathe + hop * 0.08;
+  traveler.body.scale.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy));
+  traveler.body.position.y = Math.abs(Math.sin(player.phase)) * 0.04 * s + hop * 0.16;
+  traveler.head.rotation.z = Math.sin(time * 1.3) * 0.04 * idle;
+  traveler.head.rotation.x = -hop * 0.25;
+  traveler.head.rotation.y = Math.sin(time * 0.37) * Math.sin(time * 0.23 + 1) * 0.7 * idle * (sheetState ? 0.2 : 1);
   traveler.pack.position.y = 0.5 + Math.abs(Math.cos(player.phase)) * 0.025 * s;
   traveler.pack.rotation.x = -0.08 * s;
   traveler.charm.rotation.z = Math.sin(player.phase) * 0.5 * s + Math.sin(time * 1.7) * 0.08;
@@ -959,10 +1105,16 @@ function updateLabels() {
     }
     if (visible && occludedByPlanet(labelPos)) visible = false;
     const projected = labelPos.clone().project(camera);
-    if (projected.z > 1 || Math.abs(projected.x) > 1.1 || Math.abs(projected.y) > 1.1) visible = false;
+    if (projected.z > 1) visible = false;
+    const sx = (projected.x * 0.5 + 0.5) * w;
+    const sy = (-projected.y * 0.5 + 0.5) * h;
+    // Keep labels clear of the HUD at the top and fully on screen; hide rather than clip.
+    if (sx < 44 || sx > w - 44 || sy < 120 || sy > h - 24) visible = false;
+    // The intro copy already names every stop; labels appear once the traveler lands.
+    if (cam.mode === "intro") visible = false;
     label.el.style.opacity = visible ? "1" : "0";
     if (visible) {
-      label.el.style.transform = `translate(${(projected.x * 0.5 + 0.5) * w}px, ${(-projected.y * 0.5 + 0.5) * h}px) translate(-50%, -100%)`;
+      label.el.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
     }
   });
 }
@@ -1084,7 +1236,10 @@ window.addEventListener("keydown", event => {
     return;
   }
   if ((event.code === "Enter" || event.code === "Space") && !sheetState) {
-    if (cam.mode === "intro") setFollow();
+    if (cam.mode === "intro") {
+      sound.start();
+      setFollow();
+    }
     else if (lastNearId) openObject(lastNearId);
     event.preventDefault();
     return;
@@ -1135,7 +1290,9 @@ function frame() {
   const dt = Math.min(rawDt, 0.05);
   const time = clock.elapsedTime;
   measure(rawDt, time);
+  clockNow = time;
   world.update(dt, time);
+  sound.tick(Number(life.answers.dashboard.play ?? 5) / 10);
   updatePlayer(dt, time);
   updateCamera(dt, time);
   world.render(camera);

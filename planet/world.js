@@ -249,10 +249,10 @@ function buildWorkshop() {
   addShadowDisc(group, 0.7);
 
   // Smoke: low-poly puffs that rise, swell and fade.
-  const puffGeo = new THREE.IcosahedronGeometry(0.1, 1);
+  const puffGeo = new THREE.IcosahedronGeometry(0.1, 0);
   const puffs = [];
   for (let i = 0; i < 24; i += 1) {
-    const mesh = new THREE.Mesh(puffGeo, toon("#ffffff", { transparent: true, opacity: 0, depthWrite: false }));
+    const mesh = new THREE.Mesh(puffGeo, toon("#ffffff", { transparent: true, opacity: 0, depthWrite: false, flatShading: true }));
     mesh.visible = false;
     mesh.userData.decor = true;
     group.add(mesh);
@@ -264,7 +264,7 @@ function buildWorkshop() {
 function buildLanterns() {
   const group = new THREE.Group();
   const cream = toon(PAL.cream);
-  const navy = toon(PAL.navy);
+  const wood = toon("#c98f63");
   const posts = [];
   const glassMats = [];
   const halos = [];
@@ -273,11 +273,11 @@ function buildLanterns() {
     pivot.position.x = side * 0.5;
     pivot.add(box(0.16, 0.08, 0.16, toon(PAL.stone), 0, 0.04, 0));
     pivot.add(box(0.09, 0.82, 0.09, cream, 0, 0.45, 0));
-    pivot.add(box(0.22, 0.04, 0.04, navy, -side * 0.08, 0.89, 0));
+    pivot.add(box(0.22, 0.04, 0.04, wood, -side * 0.08, 0.89, 0));
     const glassMat = glow("#ffd27a", 1.2);
     const lamp = box(0.12, 0.12, 0.12, glassMat, -side * 0.16, 0.78, 0);
     lamp.rotation.y = Math.PI / 4;
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.08, 4), navy);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.08, 4), wood);
     cap.position.set(-side * 0.16, 0.88, 0);
     pivot.add(lamp, cap);
     halos.push(addHalo(pivot, lamp.position, 0.5));
@@ -310,19 +310,19 @@ function buildBench() {
 function buildVine() {
   const group = new THREE.Group();
   const knot = new THREE.Group();
-  const vineMat = toon(PAL.navy);
-  const core = new THREE.Mesh(new THREE.TorusKnotGeometry(0.34, 0.07, 180, 14, 2, 3), vineMat);
+  const vineMat = toon("#6f8f7c", { flatShading: true });
+  const core = new THREE.Mesh(new THREE.TorusKnotGeometry(0.34, 0.075, 64, 6, 2, 3), vineMat);
   core.position.y = 0.42;
   core.rotation.x = Math.PI / 2;
   knot.add(core);
   for (let i = 0; i < 4; i += 1) {
     const a = (i / 4) * Math.PI * 2 + 0.3;
-    const root = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 10, 24, Math.PI * 0.8), vineMat);
+    const root = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.055, 5, 10, Math.PI * 0.8), vineMat);
     root.position.set(Math.cos(a) * 0.32, 0.02, Math.sin(a) * 0.32);
     root.rotation.set(0, -a, 0);
     knot.add(root);
   }
-  const thornMat = toon(PAL.lilac);
+  const thornMat = toon(PAL.cream);
   for (let i = 0; i < 12; i += 1) {
     const a = i * 2.4;
     const thorn = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 4), thornMat);
@@ -563,6 +563,8 @@ export function createWorld(canvas) {
   const rand = rng(612);
 
   const ambient = new THREE.HemisphereLight(0xfff4ea, 0xc9d6f0, 1.4);
+  const ambientWarm = new THREE.Color(0xfff0e0);
+  const ambientDull = new THREE.Color(0xe4e7ee);
   scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xfff1df, 2.2);
   sun.position.copy(SUN).multiplyScalar(30);
@@ -580,7 +582,7 @@ export function createWorld(canvas) {
 
   const benchDir = TERMINATOR.clone().multiplyScalar(0.97).add(SUN.clone().multiplyScalar(0.26)).normalize();
   const layout = {
-    spring: { dir: dirAt(34, 120), radius: 1.2 / R, labelHeight: 0.85, focus: 1.1, parts: [spring.group] },
+    spring: { dir: dirAt(34, 120), radius: 1.2 / R, labelHeight: 1.35, focus: 1.1, parts: [spring.group] },
     workshop: { dir: dirAt(40, 190), radius: 0.85 / R, labelHeight: 1.75, focus: 1.3, parts: [workshop.group] },
     bench: { dir: benchDir, radius: 0.55 / R, labelHeight: 0.9, focus: 0.9, parts: [bench.group] },
     lanterns: { dir: dirAt(32, 52), radius: 0.65 / R, labelHeight: 1.2, focus: 1.05, parts: [lanterns.group] },
@@ -600,6 +602,23 @@ export function createWorld(canvas) {
   layout.workshop.front = Z.clone().applyQuaternion(workshop.group.quaternion);
   layout.lanterns.front = Z.clone().applyQuaternion(lanterns.group.quaternion);
 
+  // Scale animations driven by world time: pop-ins on load, squash-and-stretch on celebrations.
+  // The planet and its buildings are on screen from the first frame; everything else lands around them.
+  const pops = [];
+  let clockTime = 0;
+  function popIn(obj, delay, from = 0) {
+    pops.push({ obj, base: obj.scale.clone(), start: delay, kind: "in", from });
+    obj.scale.copy(obj.scale).multiplyScalar(Math.max(from, 0.0001));
+  }
+  function squash(obj, amount = 0.22) {
+    for (let i = pops.length - 1; i >= 0; i -= 1) if (pops[i].obj === obj && pops[i].kind === "squash") pops.splice(i, 1);
+    pops.push({ obj, base: obj.userData.baseScale || obj.scale.clone(), start: clockTime, kind: "squash", amount });
+  }
+  [spring.group, workshop.group, lanterns.group, bench.group, vine.group, sign.group].forEach((g, i) => {
+    g.userData.baseScale = g.scale.clone();
+    popIn(g, 0.05 + i * 0.06, 0.6);
+  });
+
   const blockers = Object.values(layout).map(item => ({ dir: item.dir, radius: item.radius }));
   scene.add(buildPath(blockers));
 
@@ -608,6 +627,7 @@ export function createWorld(canvas) {
     const arch = buildArch();
     placeOnPlanet(arch, dir, yawToward(dir, dirAt(a, b + 3)) + Math.PI / 2);
     scene.add(arch);
+    popIn(arch, 0.35 + b / 900);
   });
 
   // Trees: a loose ring around the lived-in area plus a sprinkling over the rest of the planet.
@@ -619,20 +639,9 @@ export function createWorld(canvas) {
     const tree = buildTree(rand);
     placeOnPlanet(tree.group, dir, rand() * 6);
     scene.add(tree.group);
+    popIn(tree.group, 0.15 + trees.length * 0.035);
     trees.push(tree);
     blockers.push({ dir, radius: tree.radius });
-  }
-
-  // Small floating shapes orbiting the planet.
-  const floaters = [];
-  const floaterGeos = [new THREE.OctahedronGeometry(0.14, 0), new THREE.BoxGeometry(0.18, 0.18, 0.18), new THREE.TetrahedronGeometry(0.16, 0)];
-  const floaterColors = [PAL.gold, PAL.pink, PAL.cream, PAL.sky, PAL.lilac];
-  for (let i = 0; i < 14; i += 1) {
-    const mesh = new THREE.Mesh(floaterGeos[i % 3], toon(floaterColors[i % floaterColors.length]));
-    const axis = randomDir(rand);
-    const start = randomDir(rand).cross(axis).normalize();
-    scene.add(mesh);
-    floaters.push({ mesh, axis, start, radius: R + 1.4 + rand() * 2.2, speed: 0.05 + rand() * 0.07, spin: rand() * 2 });
   }
 
   // Footstep dust: small pale puffs kicked up by main.js as the traveler walks.
@@ -666,19 +675,21 @@ export function createWorld(canvas) {
   const post = createPost(renderer, scene, camera);
 
   const current = { health: 0.5, work: 0.5, play: 0.5, love: 0.5, gravity: 0, designable: 0, problem: 0 };
+  // The four dashboard values move on a slightly underdamped spring, so a change overshoots and settles.
+  const velocity = { health: 0, work: 0, play: 0, love: 0 };
   const target = { ...current };
   let paintedPlay = -1;
   const groundLush = new THREE.Color(PAL.ground);
-  const groundDry = new THREE.Color(PAL.groundDry);
+  const groundDry = new THREE.Color("#d8c48f");
   const windowCalm = new THREE.Color("#ffcc7a");
   const windowHot = new THREE.Color("#ff5a3a");
-  const smokeDark = new THREE.Color("#4a4458");
+  const smokeDark = new THREE.Color("#3a3644");
   const smokeLight = new THREE.Color("#ffffff");
-  const murky = new THREE.Color("#b3ab82");
-  const clear = new THREE.Color("#6cc7c9");
+  const murky = new THREE.Color("#8f7b55");
+  const clear = new THREE.Color("#5fd2d6");
   // Backdrop colours for a joyful (vivid) and a joyless (dull) play score.
-  const skyVivid = { top: "#f8d6c3", middle: "#f3c9c8", bottom: "#a9c6ea", sun: "#fff4df", sunRing: "#ffe0c2", cloud: "#ffffff", cloudShade: "#e8def4" };
-  const skyDull = { top: "#d8d4d9", middle: "#cbc8d2", bottom: "#aeb6c6", sun: "#ecebe8", sunRing: "#dddbe0", cloud: "#e4e4ea", cloudShade: "#cfd0db" };
+  const skyVivid = { top: "#ffc9a8", middle: "#ffb8b0", bottom: "#9ec3f0", sun: "#fff6d8", sunRing: "#ffd59e", cloud: "#ffffff", cloudShade: "#f3d8e6" };
+  const skyDull = { top: "#b9bcc6", middle: "#c4c6cd", bottom: "#a6abb8", sun: "#d4d5d9", sunRing: "#c9cad0", cloud: "#d9dbe1", cloudShade: "#b9bcc7" };
   const skyColors = Object.fromEntries(Object.keys(skyVivid).map(key => [key, new THREE.Color()]));
   const screen = { w: window.innerWidth, h: window.innerHeight };
 
@@ -698,6 +709,32 @@ export function createWorld(canvas) {
 
   function snap() {
     Object.assign(current, target);
+    Object.keys(velocity).forEach(key => { velocity[key] = 0; });
+  }
+
+  // Celebration timers (world time when each started) for one-off reactions to a confirmed answer.
+  const fx = { glint: -10, orb: -10, bulbs: -10, gem: -10, flash: -10, sprout: -10 };
+  const bumpAt = (start, duration) => {
+    const t = (clockTime - start) / duration;
+    return t > 0 && t < 1 ? Math.sin(t * Math.PI) : 0;
+  };
+
+  function celebrate(id) {
+    const group = { spring: spring.group, workshop: workshop.group, lanterns: lanterns.group, bench: bench.group, vine: vine.group, sign: sign.group }[id];
+    if (group) squash(group);
+    if (id === "spring") {
+      fx.glint = clockTime;
+      fx.orb = clockTime;
+    } else if (id === "workshop") {
+      fx.flash = clockTime;
+      workshop.spawn += 6;
+    } else if (id === "lanterns") {
+      fx.bulbs = clockTime;
+    } else if (id === "vine") {
+      fx.sprout = clockTime;
+    } else if (id === "sign") {
+      fx.gem = clockTime;
+    }
   }
 
   function updateWorkshop(v, dt, time) {
@@ -731,23 +768,55 @@ export function createWorld(canvas) {
       p.mesh.position.x += p.drift.x * dt;
       p.mesh.position.z += p.drift.y * dt;
       p.mesh.scale.setScalar(0.6 + k * (1.6 + (1 - w) * 1.8));
-      p.mesh.material.color.copy(smokeLight).lerp(smokeDark, (1 - w) * 0.85);
-      p.mesh.material.opacity = Math.sin(k * Math.PI) * (0.5 + (1 - w) * 0.4);
+      p.mesh.material.color.copy(smokeLight).lerp(smokeDark, THREE.MathUtils.smoothstep(1 - w, 0.25, 0.8));
+      p.mesh.material.opacity = Math.sin(k * Math.PI) * (0.55 + (1 - w) * 0.4);
     });
   }
 
   function update(dt, time) {
+    clockTime = time;
     const k = 1 - Math.exp(-dt * 2.5);
-    Object.keys(current).forEach(key => { current[key] += (target[key] - current[key]) * k; });
+    Object.keys(current).forEach(key => {
+      if (key in velocity) {
+        velocity[key] += ((target[key] - current[key]) * 45 - velocity[key] * 7.5) * dt;
+        current[key] = THREE.MathUtils.clamp(current[key] + velocity[key] * dt, -0.05, 1.05);
+      } else {
+        current[key] += (target[key] - current[key]) * k;
+      }
+    });
+
+    pops.forEach((p, i) => {
+      const t = time - p.start;
+      if (t < 0) return;
+      if (p.kind === "in") {
+        const u = Math.min(1, t / 0.55);
+        // Ease-out-back: lands slightly oversized, then settles.
+        const c = 2.2;
+        const e = 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2);
+        p.obj.scale.copy(p.base).multiplyScalar(p.from + (1 - p.from) * e);
+        if (u >= 1) p.done = true;
+      } else {
+        const sy = 1 - p.amount * Math.sin(t * 14) * Math.exp(-t * 5);
+        const sxz = 1 / Math.sqrt(sy);
+        p.obj.scale.set(p.base.x * sxz, p.base.y * sy, p.base.z * sxz);
+        if (t > 1.2) {
+          p.obj.scale.copy(p.base);
+          p.done = true;
+        }
+      }
+    });
+    for (let i = pops.length - 1; i >= 0; i -= 1) if (pops[i].done) pops.splice(i, 1);
 
     const h = current.health;
     planet.material.color.copy(groundDry).lerp(groundLush, THREE.MathUtils.smoothstep(h, 0.05, 0.75));
-    spring.waterMat.color.copy(murky).lerp(clear, h);
+    spring.waterMat.color.copy(murky).lerp(clear, THREE.MathUtils.smoothstep(h, 0.15, 0.85));
+    spring.waterMat.emissiveIntensity = Math.max(0, h) * 0.35;
     spring.orb.material.emissiveIntensity = 0.2 + h * 1.2;
+    const burst = bumpAt(fx.glint, 1.2);
     spring.glints.forEach((ring, i) => {
       const phase = (time * 0.4 + i * 0.5) % 1;
-      ring.scale.setScalar(0.5 + phase * 2);
-      ring.material.opacity = 0.45 * (1 - phase) * h;
+      ring.scale.setScalar(0.5 + phase * 2 + burst * 0.8);
+      ring.material.opacity = Math.min(1, 0.45 * (1 - phase) * Math.max(h, 0) + burst * 0.6);
     });
 
     updateWorkshop(workshop, dt, time);
@@ -774,6 +843,8 @@ export function createWorld(canvas) {
       const on = THREE.MathUtils.clamp(lit / 2 - fromEdge, 0, 1);
       bulb.material.emissive.copy(bulbOff).lerp(bulbOn, on);
       bulb.material.emissiveIntensity = 1.8;
+      // On confirm, the lit bulbs pop one after another from both ends.
+      bulb.scale.setScalar(1 + bumpAt(fx.bulbs + fromEdge * 0.09, 0.35) * 0.9 * on);
     });
 
     const play = current.play;
@@ -781,24 +852,21 @@ export function createWorld(canvas) {
       paintedPlay = play;
       paintBackdrop(play);
     }
-    sun.intensity = 1.6 + play * 0.9;
+    sun.intensity = 1.3 + play * 1.3;
+    ambient.color.copy(ambientDull).lerp(ambientWarm, THREE.MathUtils.clamp(play, 0, 1));
 
     const knotScale = current.problem < 0.5 ? 0.45 : 0.4 + current.gravity * 1.2;
     vine.knot.scale.setScalar(knotScale);
     vine.sprout.visible = current.problem > 0.5;
-    vine.sprout.scale.setScalar(0.6 + current.designable * 1.6);
+    vine.sprout.scale.setScalar((0.6 + current.designable * 1.6) * (1 + bumpAt(fx.sprout + 0.4, 0.6) * 0.6));
     vine.glowMat.emissiveIntensity = 0.6 + Math.sin(time * 2.4) * 0.35;
 
-    sign.gem.rotation.y = time * 0.8;
-    sign.gem.position.y = 1.0 + Math.sin(time * 1.4) * 0.04;
-    spring.orb.position.y = 0.62 + Math.sin(time * 1.1) * 0.02;
+    sign.gem.rotation.y = time * 0.8 + bumpAt(fx.gem, 1) * 6;
+    sign.gem.position.y = 1.0 + Math.sin(time * 1.4) * 0.04 + bumpAt(fx.gem, 1) * 0.25;
+    spring.orb.position.y = 0.62 + Math.sin(time * 1.1) * 0.02 + bumpAt(fx.orb, 0.6) * 0.18;
+    workshop.windowMat.emissiveIntensity += bumpAt(fx.flash, 0.5) * 1.5;
 
     trees.forEach(tree => { tree.crown.rotation.z = Math.sin(time * 0.8 + tree.phase) * 0.03; });
-    floaters.forEach(f => {
-      tmpQ.setFromAxisAngle(f.axis, time * f.speed);
-      f.mesh.position.copy(f.start).applyQuaternion(tmpQ).multiplyScalar(f.radius);
-      f.mesh.rotation.set(time * 0.4 + f.spin, time * 0.6 + f.spin, 0);
-    });
     dust.forEach(d => {
       if (!d.mesh.visible) return;
       d.age += dt;
@@ -857,6 +925,6 @@ export function createWorld(canvas) {
 
   return {
     renderer, scene, camera, objects, farPlanets, blockers,
-    setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust
+    setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust, celebrate
   };
 }
