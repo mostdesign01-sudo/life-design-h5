@@ -270,7 +270,7 @@ function buildLanterns() {
   const halos = [];
   [-1, 1].forEach(side => {
     const pivot = new THREE.Group();
-    pivot.position.x = side * 0.5;
+    pivot.position.x = side * 0.6;
     pivot.add(box(0.16, 0.08, 0.16, toon(PAL.stone), 0, 0.04, 0));
     pivot.add(box(0.09, 0.82, 0.09, cream, 0, 0.45, 0));
     pivot.add(box(0.22, 0.04, 0.04, wood, -side * 0.08, 0.89, 0));
@@ -285,10 +285,11 @@ function buildLanterns() {
     posts.push(pivot);
     glassMats.push(glassMat);
   });
-  const bulbGeo = new THREE.SphereGeometry(0.026, 12, 8);
+  // Ten separate bulbs, one per point of the love score, so the count can be read at a glance.
+  const bulbGeo = new THREE.SphereGeometry(0.038, 14, 10);
   const bulbs = [];
-  for (let i = 0; i < 9; i += 1) {
-    const bulb = new THREE.Mesh(bulbGeo, new THREE.MeshToonMaterial({ color: "#fff3d6", emissive: "#ffc861", emissiveIntensity: 1, gradientMap: TOON_RAMP }));
+  for (let i = 0; i < 10; i += 1) {
+    const bulb = new THREE.Mesh(bulbGeo, new THREE.MeshToonMaterial({ color: "#b7b0aa", emissive: "#ffc861", emissiveIntensity: 1, gradientMap: TOON_RAMP }));
     group.add(bulb);
     bulbs.push(bulb);
   }
@@ -369,9 +370,9 @@ function buildSignpost() {
   const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.1, 0), glow(PAL.gold, 1.4));
   gem.position.y = 1.0;
   group.add(gem);
-  addHalo(group, gem.position, 0.5);
+  const halo = addHalo(group, gem.position, 0.5);
   addShadowDisc(group, 0.32);
-  return { group, gem };
+  return { group, gem, halo };
 }
 
 // ---------- decor ----------
@@ -703,6 +704,18 @@ export function createWorld(canvas) {
   const lanternB = new THREE.Vector3();
   const tmpQ = new THREE.Quaternion();
 
+  let diaryReady = false;
+  function setDiaryReady(ready) {
+    diaryReady = ready;
+  }
+
+  // In close-ups, hide trees that sit between the camera and the subject.
+  let cull = null;
+  const cullTmp = new THREE.Vector3();
+  function setNearCull(dir, look) {
+    cull = dir ? { dir, look } : null;
+  }
+
   function setTargets(next) {
     Object.assign(target, next);
   }
@@ -833,16 +846,20 @@ export function createWorld(canvas) {
     lanterns.posts[1].updateMatrix();
     lanternA.set(0.16, 0.74, 0).applyMatrix4(lanterns.posts[0].matrix);
     lanternB.set(-0.16, 0.74, 0).applyMatrix4(lanterns.posts[1].matrix);
-    const lit = love * lanterns.bulbs.length;
+    // Exactly as many bulbs are lit as the score (by target, so the count never shows half a bulb).
+    const lit = Math.round(THREE.MathUtils.clamp(target.love, 0, 1) * lanterns.bulbs.length);
     lanterns.bulbs.forEach((bulb, i) => {
       const t = (i + 1) / (lanterns.bulbs.length + 1);
       bulb.position.lerpVectors(lanternA, lanternB, t);
-      bulb.position.y -= Math.sin(t * Math.PI) * (0.12 + (1 - love) * 0.18);
+      bulb.position.y -= Math.sin(t * Math.PI) * (0.1 + (1 - love) * 0.14);
       // Light spreads in from both ends, meeting in the middle.
       const fromEdge = Math.min(i, lanterns.bulbs.length - 1 - i);
-      const on = THREE.MathUtils.clamp(lit / 2 - fromEdge, 0, 1);
+      const rank = fromEdge * 2 + (i < lanterns.bulbs.length / 2 ? 0 : 1);
+      const on = rank < lit ? 1 : 0;
+      bulb.material.color.set(on ? "#ffc65c" : "#b7b0aa");
       bulb.material.emissive.copy(bulbOff).lerp(bulbOn, on);
-      bulb.material.emissiveIntensity = 1.8;
+      // Kept below the bloom threshold so each bulb stays a distinct dot rather than one streak.
+      bulb.material.emissiveIntensity = 0.18;
       // On confirm, the lit bulbs pop one after another from both ends.
       bulb.scale.setScalar(1 + bumpAt(fx.bulbs + fromEdge * 0.09, 0.35) * 0.9 * on);
     });
@@ -861,12 +878,18 @@ export function createWorld(canvas) {
     vine.sprout.scale.setScalar((0.6 + current.designable * 1.6) * (1 + bumpAt(fx.sprout + 0.4, 0.6) * 0.6));
     vine.glowMat.emissiveIntensity = 0.6 + Math.sin(time * 2.4) * 0.35;
 
+    // The diary is the last stop: its gem stays dim until the other stops are done.
+    sign.gem.material.emissiveIntensity = diaryReady ? 1.4 : 0.15;
+    sign.halo.visible = diaryReady;
     sign.gem.rotation.y = time * 0.8 + bumpAt(fx.gem, 1) * 6;
     sign.gem.position.y = 1.0 + Math.sin(time * 1.4) * 0.04 + bumpAt(fx.gem, 1) * 0.25;
     spring.orb.position.y = 0.62 + Math.sin(time * 1.1) * 0.02 + bumpAt(fx.orb, 0.6) * 0.18;
     workshop.windowMat.emissiveIntensity += bumpAt(fx.flash, 0.5) * 1.5;
 
-    trees.forEach(tree => { tree.crown.rotation.z = Math.sin(time * 0.8 + tree.phase) * 0.03; });
+    trees.forEach(tree => {
+      tree.crown.rotation.z = Math.sin(time * 0.8 + tree.phase) * 0.03;
+      tree.group.visible = !cull || cullTmp.copy(tree.group.position).sub(cull.look).dot(cull.dir) < 1.2;
+    });
     dust.forEach(d => {
       if (!d.mesh.visible) return;
       d.age += dt;
@@ -925,6 +948,6 @@ export function createWorld(canvas) {
 
   return {
     renderer, scene, camera, objects, farPlanets, blockers,
-    setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust, celebrate
+    setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust, celebrate, setDiaryReady, setNearCull
   };
 }

@@ -232,6 +232,7 @@ function renderQuests() {
     </li>
   `).join("");
   const next = nextQuest();
+  world.setDiaryReady(SCORE_IDS.every(isDone));
   labelEls.forEach(label => {
     label.el.classList.toggle("is-done", !label.far && isDone(label.id));
     label.el.classList.toggle("is-next", !label.far && label.id === next?.id);
@@ -727,7 +728,7 @@ function makePostcard() {
   shotCam.position.set(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)).multiplyScalar(CAM_DISTANCE);
   shotCam.up.set(0, 1, 0);
   shotCam.lookAt(0, 0.4, 0);
-  applyView(shotCam, 16.5, 1);
+  applyView(shotCam, 14.6, 1);
   const shot = world.snapshot(shotCam, W);
 
   const card = document.createElement("canvas");
@@ -766,23 +767,29 @@ function makePostcard() {
     const cx = 72 + i * 240;
     const score = Number(d[item.key] ?? 5);
     const color = CARD_COLORS[item.key];
-    drawIcon(ctx, item.key, cx + 30, 1172, 48, color);
+    drawIcon(ctx, item.key, cx + 30, 1150, 48, color);
     ctx.fillStyle = "#2f3756";
     ctx.font = `800 52px ${font}`;
-    ctx.fillText(String(score), cx + 76, 1192);
+    ctx.fillText(String(score), cx + 76, 1170);
     ctx.fillStyle = "#4f5570";
     ctx.font = `500 26px ${font}`;
-    ctx.fillText(`${item.label} · ${cardIcons[item.key]}`, cx, 1252);
+    ctx.fillText(`${item.label} · ${cardIcons[item.key]}`, cx, 1226);
   });
 
+  if (life.problem) {
+    const old = Math.round(life.problem.gravity / 10);
+    ctx.fillStyle = "#2f3756";
+    ctx.font = `600 30px ${font}`;
+    ctx.fillText(`缠绕藤里，${10 - old} 成是可以动手的新芽`, 72, 1290);
+  }
   ctx.fillStyle = "#e8ddd0";
-  ctx.fillRect(72, 1300, W - 144, 2);
+  ctx.fillRect(72, 1322, W - 144, 2);
   ctx.fillStyle = "#2f3756";
-  ctx.font = `700 32px ${font}`;
-  ctx.fillText("测测你的小星球", 72, 1370);
+  ctx.font = `700 30px ${font}`;
+  ctx.fillText("测测你的小星球", 72, 1376);
   ctx.fillStyle = "#4f5570";
   ctx.font = `400 26px ${font}`;
-  ctx.fillText(SHARE_HOST, 72, 1410);
+  ctx.fillText(SHARE_HOST, 72, 1414);
   return card.toDataURL("image/png");
 }
 
@@ -790,7 +797,7 @@ function makePostcard() {
 function celebrate(id, score) {
   world.celebrate(id);
   react.hop = clockNow;
-  if (id === "lanterns") sound.bulbs(Math.round(score * 0.9));
+  if (id === "lanterns") sound.bulbs(score);
   else if (id === "workshop") sound.puff();
   else if (id === "vine") sound.sparkle();
   sound.confirm(score);
@@ -860,6 +867,8 @@ els.startBtn.addEventListener("click", () => {
   els.hint.style.opacity = "1";
 });
 
+// Height of the top HUD row (title card and buttons) that close-ups keep their subject out of.
+const HUD_HEIGHT = 104;
 const desired = { dir: new THREE.Vector3(), look: new THREE.Vector3(), up: new THREE.Vector3(), view: 18 };
 // Camera elevation above the ground plane: the classic isometric angle, a little steeper.
 const ELEVATION = THREE.MathUtils.degToRad(38);
@@ -893,9 +902,16 @@ function updateCamera(dt, time) {
     desired.dir.copy(od).multiplyScalar(Math.sin(elevation)).addScaledVector(away, Math.cos(elevation));
     desired.look.copy(objPos).addScaledVector(od, (obj.id === "bench" ? 1.4 : 0.5) * obj.focus);
     desired.up.copy(od);
-    // Fit the object into the part of the screen the sheet leaves free.
-    const free = THREE.MathUtils.clamp(1 - (sheetState ? els.sheet.offsetHeight : 0) / window.innerHeight, 0.45, 1);
-    desired.view = viewHeightFor(3.6 * obj.focus, 3.6 * obj.focus) * (0.5 + 0.5 * free);
+    // Frame the object and the traveler together: aim between them and widen to fit both.
+    const travelerPos = traveler.group.position;
+    // Only when the traveler is actually standing nearby; otherwise frame the object alone.
+    const near = travelerPos.distanceTo(objPos) < 2.6;
+    const gap = near ? travelerPos.distanceTo(objPos) : 0;
+    if (near) desired.look.lerp(tmpV.copy(travelerPos).addScaledVector(od, 0.5), 0.3);
+    // Fit them into the part of the screen the HUD and the sheet leave free.
+    const free = THREE.MathUtils.clamp(1 - ((sheetState ? els.sheet.offsetHeight : 0) + HUD_HEIGHT) / window.innerHeight, 0.4, 1);
+    const fit = Math.max(3.6 * obj.focus, gap * 1.9 + 1.4);
+    desired.view = viewHeightFor(fit, fit) * (1 + (1 - free) * 0.55);
     const punch = (time - react.hop) / 0.6;
     if (punch > 0 && punch < 1) desired.view *= 1 - Math.sin(punch * Math.PI) * 0.08;
   } else {
@@ -924,8 +940,10 @@ function updateCamera(dt, time) {
   applyView(camera, cam.view, window.innerWidth / window.innerHeight);
   // While a sheet is open, shift the projection so the scene centres in the space above it.
   const sheetH = sheetState ? els.sheet.offsetHeight : 0;
-  cam.offset += (sheetH * 0.5 - cam.offset) * (1 - Math.exp(-dt * 6));
-  if (cam.offset > 0.5) {
+  const hud = cam.mode === "focus" ? HUD_HEIGHT : 0;
+  cam.offset += ((sheetH - hud) * 0.5 - cam.offset) * (1 - Math.exp(-dt * 6));
+  world.setNearCull(cam.mode === "focus" ? cam.dir : null, cam.look);
+  if (Math.abs(cam.offset) > 0.5) {
     const w = window.innerWidth;
     const h = window.innerHeight;
     camera.setViewOffset(w, h, 0, cam.offset, w, h);

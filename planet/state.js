@@ -105,8 +105,8 @@ export function classifyProblem(text = "") {
   gravity = Math.round((gravity / total) * 100);
   designable = 100 - gravity;
   const label = gravity > designable
-    ? "现实边界很强，先停止和墙拔河，再重定向。"
-    : "能动手的部分已经露出来了，可以先试一小步。";
+    ? "先别和这堵墙较劲。"
+    : "可以先试一小步了。";
   return { gravity, designable, label };
 }
 
