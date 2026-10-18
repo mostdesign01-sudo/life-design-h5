@@ -733,7 +733,7 @@ function drawIcon(ctx, key, x, y, s, color) {
 
 const CARD_COLORS = { health: "#3f9e9a", work: "#d0643f", play: "#c9902e", love: "#c95f7a" };
 
-function makePostcard() {
+function makePostcard(linkText = SHARE_HOST) {
   const W = 1080;
   const H = 1440;
   const shotCam = camera.clone();
@@ -823,7 +823,7 @@ function makePostcard() {
   track("0px");
   ctx.fillStyle = "#4f5570";
   ctx.font = `400 26px ${font}`;
-  ctx.fillText(SHARE_HOST, 72, 1414);
+  ctx.fillText(linkText, 72, 1414);
   return card.toDataURL("image/png");
 }
 
@@ -963,7 +963,9 @@ function updateCamera(dt, time) {
     desired.up.set(0, 1, 0);
     desired.view = introView() * 1.06;
   }
-  const rate = diveT < 1.6 ? 2.6 : cam.mode === "follow" ? 7 : 3;
+  // A director (used by the promo renderer) may take over the framing; it gets the same smoothing.
+  if (cam.director) cam.director(desired, time);
+  const rate = cam.directorRate ?? (diveT < 1.6 ? 2.6 : cam.mode === "follow" ? 7 : 3);
   const k = 1 - Math.exp(-dt * rate);
   cam.dir.lerp(desired.dir, k).normalize();
   cam.look.lerp(desired.look, k);
@@ -1390,4 +1392,4 @@ function frame() {
 requestAnimationFrame(frame);
 
 // Testing hook: lets automated checks drive the scene without pointer gestures.
-window.__planet = { goTo, setOverview, setFollow, openObject, closeSheet, life: () => life, autoTarget: () => autoTarget, cam, player };
+window.__planet = { goTo, setOverview, setFollow, openObject, closeSheet, life: () => life, autoTarget: () => autoTarget, cam, player, world, makePostcard, orbitDirection, viewHeightFor };

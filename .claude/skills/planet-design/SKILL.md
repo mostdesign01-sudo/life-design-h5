@@ -28,7 +28,7 @@ A flat, Monument Valley-style version was tried and rejected: on a sphere covere
 - The UI accent is `--accent` #c95a26 (white text on it passes 4.5:1).
 - Text contrast is at least 4.5:1 everywhere, including label subtitles and postcard captions. Check this when lightening anything grey.
 - Scores must change the world in a way you can read from a screenshot, pushed to both extremes:
-  - Play: sky golden or overcast, and the sun fades.
+  - Play: sky golden or overcast, and the sun fades. Above about 7 the whole sky, top to horizon, slides into a pink-orange evening glow (`midDusk`, `topDusk`, `horizonDusk`, `bottomDusk`); to show it on camera, face away from the sun, because looking into it washes the sky out to cream.
   - Work: white or charcoal smoke, warm or red windows.
   - Health: clear or muddy water, mint or straw ground.
   - Love: N of 10 bulbs lit, gold against dark grey.

@@ -1150,6 +1150,13 @@ export function createWorld(canvas) {
   const clear = new THREE.Color(0x5cc3dc);
   const horizonVivid = new THREE.Color("#ffdcae");
   const horizonDull = new THREE.Color("#b7bcc8");
+  const midDay = skyUniforms.uMid.value.clone();
+  const topDay = skyUniforms.uTop.value.clone();
+  const midDusk = new THREE.Color("#ffb489");
+  const horizonDusk = new THREE.Color("#ffa877");
+  const bottomDay = skyUniforms.uBottom.value.clone();
+  const bottomDusk = new THREE.Color("#ffc39b");
+  const topDusk = new THREE.Color("#8a76b8");
   const fogTint = new THREE.Color(0xf3e3d6);
   const cloudVivid = new THREE.Color(0xffffff);
   const cloudDull = new THREE.Color(0xb8bcc9);
@@ -1324,7 +1331,12 @@ export function createWorld(canvas) {
 
     const play = current.play;
     skyUniforms.uVivid.value = play;
-    skyUniforms.uHorizon.value.copy(horizonDull).lerp(horizonVivid, play);
+    // Near the top of the scale the whole sky turns to evening glow, horizon included.
+    const glowK = THREE.MathUtils.smoothstep(play, 0.7, 1);
+    skyUniforms.uHorizon.value.copy(horizonDull).lerp(horizonVivid, play).lerp(horizonDusk, glowK * 0.85);
+    skyUniforms.uMid.value.copy(midDay).lerp(midDusk, glowK);
+    skyUniforms.uTop.value.copy(topDay).lerp(topDusk, glowK);
+    skyUniforms.uBottom.value.copy(bottomDay).lerp(bottomDusk, glowK * 0.8);
     scene.fog.color.copy(skyUniforms.uHorizon.value).lerp(fogTint, 0.6);
     clouds.materials.forEach(m => m.color.copy(cloudDull).lerp(cloudVivid, play));
     sun.intensity = 1.4 + play * 1.6;

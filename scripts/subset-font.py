@@ -1,6 +1,6 @@
 # Usage: npm pack @fontsource/noto-serif-sc@5.3.1 && tar xzf fontsource-noto-serif-sc-5.3.1.tgz
 #        pip install fonttools brotli
-#        python3 scripts/subset-font.py package . 600 vendor/fonts/planet-serif-600.woff2
+#        python3 scripts/subset-font.py package . 600 vendor/fonts/planet-serif-600.woff2 [extra files...]
 # Build one small woff2 holding only the glyphs the planet page uses, from Fontsource's split chunks.
 import glob, os, re, sys
 from fontTools import subset
@@ -8,7 +8,9 @@ from fontTools.merge import Merger
 from fontTools.ttLib import TTFont
 
 pkg, repo, weight, out_name = sys.argv[1:5]
-text = "".join(open(os.path.join(repo, f), encoding="utf8").read() for f in ["planet.html", "planet/main.js", "planet/state.js"])
+# Extra source files (e.g. the promo overlay) can be listed after the output path.
+sources = ["planet.html", "planet/main.js", "planet/state.js"] + sys.argv[5:]
+text = "".join(open(os.path.join(repo, f), encoding="utf8").read() for f in sources)
 text += "0123456789%·：，。！？、—…「」“”"
 chars = sorted({c for c in text if ord(c) > 32})
 unicodes = [ord(c) for c in chars]

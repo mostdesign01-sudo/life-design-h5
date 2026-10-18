@@ -1,0 +1,61 @@
+{
+  "note": "每条画面文字的出处。只用产品已有的说法，不写任何用户数、评分或效果承诺。",
+  "claims": [
+    {
+      "screen": "你的人生，是一颗小星球",
+      "basis": "产品开场的比喻：每个人住在一颗小星球上，物件对应人生的几个方面",
+      "source": "planet.html 开场文案（#intro）"
+    },
+    {
+      "screen": "健康、工作、娱乐和爱，都长在上面",
+      "basis": "泉水、工坊、晚霞、双生灯，是你的健康、工作、娱乐和爱",
+      "source": "planet.html:522"
+    },
+    {
+      "screen": "工作堵着，烟囱就冒黑烟",
+      "basis": "投入、价值、回报，任何一项长期堵着，烟囱就会冒黑烟",
+      "source": "planet/main.js:26"
+    },
+    {
+      "screen": "爱有几分，灯就亮几颗",
+      "basis": "灯串亮了几颗，取决于你们之间流动了多少；10 颗灯泡，几分亮几颗",
+      "source": "planet/main.js:50；planet/world.js 灯泡逻辑（lit = 分数 × 10 颗）"
+    },
+    {
+      "screen": "多久没好好看一次晚霞了？",
+      "basis": "晚霞长椅：坐下来，什么都不做，看一会儿天；娱乐分数决定天空的颜色",
+      "source": "planet/main.js:38；planet/world.js 天空随 play 变化"
+    },
+    {
+      "screen": "明信片：灯串亮到了对面，泉水还有点浑",
+      "basis": "明信片标题由最高分和最低分的物件自动生成",
+      "source": "planet/main.js:676-679（CARD_PHRASES）"
+    },
+    {
+      "screen": "明信片：缠绕藤里，6 成是可以动手的新芽",
+      "basis": "明信片按核心困扰的「可以设计的部分」写出比例；片中是示例答案（可设计 60%）算出的结果，卡片右上角标「示例」",
+      "source": "planet/main.js:814；promo/render.mjs 示例答案 problem.designable = 60"
+    },
+    {
+      "screen": "明信片：星球 LD-0612 · 2026.10.18",
+      "basis": "明信片自动写上星球编号和日期；片中编号是示例种子，日期是渲染日",
+      "source": "planet/main.js:783"
+    },
+    {
+      "screen": "测测你的小星球",
+      "basis": "明信片底部的行动号召",
+      "source": "planet/main.js:822"
+    },
+    {
+      "screen": "约 3 分钟 · 6 个小站",
+      "basis": "开场页的时长说明",
+      "source": "planet.html:524"
+    },
+    {
+      "screen": "链接在评论区",
+      "basis": "发布方式的假设，不是产品功能；换发布渠道时改这一句",
+      "source": "promo/overlay.js 行动号召"
+    }
+  ],
+  "demo_scores": "片中演示用分数：健康 7、工作 2→9、娱乐 2→9、爱 0→10，核心困扰 可设计 60%，仅为演示。分数卡和明信片都标注「示例」。"
+}
