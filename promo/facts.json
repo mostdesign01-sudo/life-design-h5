@@ -32,9 +32,9 @@
       "source": "planet/main.js:676-679（CARD_PHRASES）"
     },
     {
-      "screen": "明信片：缠绕藤里，6 成是可以动手的新芽",
-      "basis": "明信片按核心困扰的「可以设计的部分」写出比例；片中是示例答案（可设计 60%）算出的结果，卡片右上角标「示例」",
-      "source": "planet/main.js:814；promo/render.mjs 示例答案 problem.designable = 60"
+      "screen": "明信片：缠绕藤 · 核心困扰 / 4 成老藤，6 成是可以动手的新芽",
+      "basis": "明信片按核心困扰里「拔不动的部分」和「可以设计的部分」写出比例，说法与缠绕藤小站一致（这团藤里，大约几成是拔不动的老藤，几成是可以动手的新芽）；片中是示例答案（重力 40%）算出的结果，卡片右上角标「示例」",
+      "source": "planet/main.js:463（小站文案）；planet/main.js makePostcard；promo/render.mjs 示例答案 problem.gravity = 40"
     },
     {
       "screen": "明信片：星球 LD-0612 · 2026.10.18",

@@ -36,12 +36,12 @@
     #promo .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 8px; background: #c95a26; }
     #promo .dot { position: absolute; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; background: #c95a26; border: 4px solid #fff; box-shadow: 0 2px 8px rgba(35, 29, 43, 0.25); }
     #promo .scrim { position: absolute; inset: 0; background: linear-gradient(180deg, #fbf3e8, #f6ecde); }
-    #promo .card { position: absolute; left: 50%; top: 158px; width: 360px; margin-left: -180px; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(35, 29, 43, 0.28); }
+    #promo .card { position: absolute; left: 50%; top: 174px; width: 340px; margin-left: -170px; transform-origin: 50% 0; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(35, 29, 43, 0.28); }
     #promo .card img { display: block; width: 100%; }
-    #promo .link { position: absolute; left: 0; right: 0; top: 654px; text-align: center; }
+    #promo .link { position: absolute; left: 0; right: 0; top: 632px; text-align: center; }
     #promo .link b { display: inline-block; padding: 7px 18px 7px 22px; border-radius: 999px; background: #a9471a; color: #fff; font-family: -apple-system, "PingFang SC", "WenQuanYi Zen Hei", sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.2em; box-shadow: 0 6px 18px rgba(169, 71, 26, 0.28); }
     #promo .card-tag { position: absolute; top: 14px; right: 14px; padding: 3px 10px 3px 12px; border-radius: 999px; background: #c95a26; color: #fff; font-family: -apple-system, "PingFang SC", "WenQuanYi Zen Hei", sans-serif; font-size: 13px; letter-spacing: 0.2em; }
-    #promo .cta { position: absolute; left: 0; right: 0; top: 72px; text-align: center; }
+    #promo .cta { position: absolute; left: 0; right: 0; top: 80px; text-align: center; }
     #promo .cta b { display: block; font-weight: 600; font-size: 36px; letter-spacing: 0.16em; padding-left: 0.16em; text-shadow: 0 0 18px rgba(251, 243, 232, 0.9); }
     #promo .cta span { display: block; margin-top: 8px; font-family: -apple-system, "PingFang SC", "WenQuanYi Zen Hei", sans-serif; font-size: 12px; letter-spacing: 0.28em; color: #4f5570; text-shadow: 0 0 10px rgba(251, 243, 232, 0.9); }
   `;
@@ -143,13 +143,14 @@
 
     // Closing: the postcard rises from below, overshoots a little and settles; the call to action follows.
     const card = easeOutBack((t - ev.card_rise) / (ev.card_land - ev.card_rise + 0.25));
-    // After landing the card keeps drifting slowly toward the viewer, so the last beat never freezes.
+    // After landing the card keeps growing slowly from its top edge, so the last beat never freezes
+    // and the card never rises into the title above it.
     const settle = clamp((t - ev.card_land) / (timing.length - ev.card_land));
     $("pScrim").style.opacity = easeOut((t - ev.card_rise + 0.1) / 0.45);
     $("pCard").style.opacity = clamp((t - ev.card_rise) / 0.2);
     // The overshoot is kept small so the rising card never touches the title above it.
     const rise = (1 - card) * 760;
-    $("pCard").style.transform = `translateY(${((rise < 0 ? rise * 0.15 : rise) - settle * 8).toFixed(2)}px) rotate(${((1 - clamp(card)) * -4).toFixed(2)}deg) scale(${(1 + settle * 0.045).toFixed(4)})`;
+    $("pCard").style.transform = `translateY(${(rise < 0 ? rise * 0.15 : rise).toFixed(2)}px) rotate(${((1 - clamp(card)) * -4).toFixed(2)}deg) scale(${(1 + settle * 0.04).toFixed(4)})`;
     // Words wait until the card has landed, so nothing fades in over a moving card.
     const cta = easeOut((t - ev.cta - 0.1) / 0.45);
     $("pCta").style.opacity = cta;

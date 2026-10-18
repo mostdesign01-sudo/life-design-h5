@@ -733,9 +733,10 @@ function drawIcon(ctx, key, x, y, s, color) {
 
 const CARD_COLORS = { health: "#3f9e9a", work: "#d0643f", play: "#c9902e", love: "#c95f7a" };
 
+// linkText null leaves off the footer (the promo prints its own call to action beside the card).
 function makePostcard(linkText = SHARE_HOST) {
   const W = 1080;
-  const H = 1440;
+  const H = linkText === null ? 1360 : 1440;
   const shotCam = camera.clone();
   shotCam.clearViewOffset();
   // Look down on the lived-in side so every stop sits on the visible half of the planet.
@@ -758,13 +759,14 @@ function makePostcard(linkText = SHARE_HOST) {
   ctx.fillStyle = "#fbf3e8";
   ctx.fillRect(0, 0, W, H);
   // The planet and its sky fade softly into the card instead of sitting in a hard-edged window.
-  const top = 270;
-  const size = 850;
+  const top = 292;
+  const size = 780;
   const left = (W - size) / 2;
   ctx.drawImage(shot, 0, 0, W, W, left, top, size, size);
   const cx = W / 2;
   const cy = top + size / 2;
-  const fade = ctx.createRadialGradient(cx, cy, size * 0.36, cx, cy, size * 0.52);
+  // Fully cream just inside the window edge, so nothing on the rim is cut by a hard line.
+  const fade = ctx.createRadialGradient(cx, cy, size * 0.36, cx, cy, size * 0.49);
   fade.addColorStop(0, "rgba(251,243,232,0)");
   fade.addColorStop(1, "#fbf3e8");
   ctx.fillStyle = fade;
@@ -789,41 +791,60 @@ function makePostcard(linkText = SHARE_HOST) {
   ctx.fillText(line2, 72, 276);
   track("0px");
 
+  // Lower block on one rhythm: scores, a hairline, the vine note, then the footer row.
   const d = life.answers.dashboard;
   const cardIcons = { health: "泉水", work: "工坊", play: "晚霞", love: "双生灯" };
   dashboardItems.forEach((item, i) => {
     const x = 72 + i * 240;
     const score = Number(d[item.key] ?? 5);
     const color = CARD_COLORS[item.key];
-    drawIcon(ctx, item.key, x + 30, 1172, 48, color);
+    drawIcon(ctx, item.key, x + 24, 1086, 44, color);
     ctx.fillStyle = "#2f3756";
-    ctx.font = `600 54px ${serif}`;
-    ctx.fillText(String(score), x + 76, 1192);
+    ctx.font = `600 52px ${serif}`;
+    ctx.fillText(String(score), x + 64, 1104);
     ctx.fillStyle = "#4f5570";
-    ctx.font = `500 24px ${font}`;
+    ctx.font = `500 22px ${font}`;
     track("3px");
-    ctx.fillText(`${item.label} · ${cardIcons[item.key]}`, x, 1240);
+    ctx.fillText(`${item.label} · ${cardIcons[item.key]}`, x, 1150);
     track("0px");
   });
+  ctx.fillStyle = "#e8ddd0";
+  ctx.fillRect(72, 1190, W - 144, 2);
 
   if (life.problem) {
     const old = Math.round(life.problem.gravity / 10);
+    ctx.fillStyle = "#c95a26";
+    ctx.fillRect(72, 1232, 28, 3);
+    ctx.fillStyle = "#4f5570";
+    ctx.font = `500 22px ${font}`;
+    track("4px");
+    ctx.fillText("缠绕藤 · 核心困扰", 114, 1242);
     ctx.fillStyle = "#2f3756";
-    ctx.font = `600 30px ${serif}`;
+    ctx.font = `600 34px ${serif}`;
     track("2px");
-    ctx.fillText(`缠绕藤里，${10 - old} 成是可以动手的新芽`, 72, 1298);
+    ctx.fillText(`${old} 成老藤，${10 - old} 成是可以动手的新芽`, 72, 1292);
     track("0px");
   }
-  ctx.fillStyle = "#e8ddd0";
-  ctx.fillRect(72, 1326, W - 144, 2);
-  ctx.fillStyle = "#2f3756";
-  ctx.font = `600 30px ${serif}`;
-  track("4px");
-  ctx.fillText("测测你的小星球", 72, 1376);
-  track("0px");
-  ctx.fillStyle = "#4f5570";
-  ctx.font = `400 26px ${font}`;
-  ctx.fillText(linkText, 72, 1414);
+
+  if (linkText !== null) {
+    ctx.fillStyle = "#2f3756";
+    ctx.font = `600 28px ${serif}`;
+    track("4px");
+    ctx.fillText("测测你的小星球", 72, 1384);
+    const ctaWidth = ctx.measureText("测测你的小星球").width;
+    track("0px");
+    ctx.fillStyle = "#4f5570";
+    ctx.font = `400 24px ${font}`;
+    // The link sits at the right of the same row; a long address drops below rather than colliding.
+    const linkWidth = ctx.measureText(linkText).width;
+    if (72 + ctaWidth + 40 + linkWidth <= W - 72) {
+      ctx.textAlign = "right";
+      ctx.fillText(linkText, W - 72, 1384);
+      ctx.textAlign = "left";
+    } else {
+      ctx.fillText(linkText, 72, 1418);
+    }
+  }
   return card.toDataURL("image/png");
 }
 

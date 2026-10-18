@@ -82,8 +82,9 @@ await page.evaluate(({ final, start }) => {
   const P = window.__planet;
   P.world.setTargets(final);
   P.world.snap();
-  for (let i = 0; i < 3; i += 1) window.__advance(1000 / 30);
-  window.__promo.setCard(P.makePostcard("链接在评论区"));
+  // Let the opening pop-ins (trees, bench, lamps) finish first; on a fresh clock they are still at scale 0.
+  for (let i = 0; i < 90; i += 1) window.__advance(1000 / 30);
+  window.__promo.setCard(P.makePostcard(null));
   P.world.setTargets(start);
   P.world.snap();
 }, { final: toTargets(FINAL), start: toTargets(HOOK) });

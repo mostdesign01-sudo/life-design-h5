@@ -20,6 +20,7 @@ A flat, Monument Valley-style version was tried and rejected: on a sphere covere
 - Line length and breaks: titles use `text-wrap: balance` and body text `pretty`. Rewrite copy rather than leave an orphan character or a word split across lines. Headlines generated from scores must fit on one line at 390px.
 - **The display font is a subset.** After adding or changing any Chinese copy in `planet.html`, `planet/main.js` or `planet/state.js`, regenerate it with `scripts/subset-font.py` (usage at the top of the script). Otherwise new characters fall back to a system serif.
 - Canvas text (the postcard) uses the same two faces and sets `ctx.letterSpacing` for tracked captions.
+- Postcard layout (1080 wide canvas, 72 px margins): the meta line, a two-line serif title, the planet window fading fully to cream just inside its edge, the score row, a hairline, a kicker plus one-line vine note, then a single footer row (call to action left, link right, wrapping below if long). Keep every block on that rhythm; nothing may sit closer than about 40 px to the block above. Generate it only after the opening pop-ins have finished, or the trees and bench are missing.
 
 ## Colour
 
