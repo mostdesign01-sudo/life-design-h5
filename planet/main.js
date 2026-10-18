@@ -232,10 +232,15 @@ function renderQuests() {
     </li>
   `).join("");
   const next = nextQuest();
-  world.setDiaryReady(SCORE_IDS.every(isDone));
+  const diaryReady = SCORE_IDS.every(isDone);
+  world.setDiaryReady(diaryReady);
   labelEls.forEach(label => {
     label.el.classList.toggle("is-done", !label.far && isDone(label.id));
     label.el.classList.toggle("is-next", !label.far && label.id === next?.id);
+    if (label.id === "sign") {
+      label.el.classList.toggle("is-locked", !diaryReady);
+      label.el.querySelector("small").textContent = diaryReady ? "明信片" : "最后一站";
+    }
   });
 }
 
@@ -293,7 +298,8 @@ function standSpot(obj) {
   if (!obj?.front) return null;
   const side = new THREE.Vector3().crossVectors(obj.dir, obj.front).normalize();
   const t = obj.front.clone().multiplyScalar(0.45).add(side).normalize();
-  return obj.dir.clone().multiplyScalar(Math.cos(obj.reach)).addScaledVector(t, Math.sin(obj.reach)).normalize();
+  const dist = obj.reach + 0.05;
+  return obj.dir.clone().multiplyScalar(Math.cos(dist)).addScaledVector(t, Math.sin(dist)).normalize();
 }
 
 function openSheet(state, html) {
@@ -722,14 +728,15 @@ function makePostcard() {
   const H = 1440;
   const shotCam = camera.clone();
   shotCam.clearViewOffset();
-  // The whole planet against its sky (which carries the play score), seen from the lived-in side.
-  const yaw = Math.atan2(POLE.x, POLE.z) - 0.35;
-  const pitch = 0.62;
-  shotCam.position.set(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)).multiplyScalar(CAM_DISTANCE);
+  // Look down on the lived-in side so every stop sits on the visible half of the planet.
+  const view = POLE.clone().multiplyScalar(0.8).addScaledVector(SUN, 0.35).normalize();
+  shotCam.position.copy(view).multiplyScalar(CAM_DISTANCE);
   shotCam.up.set(0, 1, 0);
-  shotCam.lookAt(0, 0.4, 0);
-  applyView(shotCam, 14.6, 1);
-  const shot = world.snapshot(shotCam, W);
+  shotCam.lookAt(0, 0, 0);
+  applyView(shotCam, 15.2, 1);
+  // The window behind the planet carries the play score: warm when there was time for joy, grey when not.
+  const tint = world.skyTint().lerp(new THREE.Color("#fbf3e8"), 0.35);
+  const shot = world.snapshot(shotCam, W, tint);
 
   const card = document.createElement("canvas");
   card.width = W;
@@ -737,18 +744,16 @@ function makePostcard() {
   const ctx = card.getContext("2d");
   ctx.fillStyle = "#fbf3e8";
   ctx.fillRect(0, 0, W, H);
-  // Crop the square render to a band between the title and the scores, softened at both edges.
-  ctx.drawImage(shot, 0, 110, W, 840, 0, 300, W, 840);
-  const fadeTop = ctx.createLinearGradient(0, 300, 0, 430);
-  fadeTop.addColorStop(0, "#fbf3e8");
-  fadeTop.addColorStop(1, "rgba(251,243,232,0)");
-  ctx.fillStyle = fadeTop;
-  ctx.fillRect(0, 300, W, 130);
-  const fadeBottom = ctx.createLinearGradient(0, 1040, 0, 1140);
-  fadeBottom.addColorStop(0, "rgba(251,243,232,0)");
-  fadeBottom.addColorStop(1, "#fbf3e8");
-  ctx.fillStyle = fadeBottom;
-  ctx.fillRect(0, 1040, W, 100);
+  // The planet sits whole inside a round window, with a margin of card all around.
+  const cx = W / 2;
+  const cy = 700;
+  const radius = 400;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.drawImage(shot, cx - radius * 1.06, cy - radius * 1.06, radius * 2.12, radius * 2.12);
+  ctx.restore();
 
   const font = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const date = new Date();
@@ -764,26 +769,26 @@ function makePostcard() {
   const d = life.answers.dashboard;
   const cardIcons = { health: "泉水", work: "工坊", play: "晚霞", love: "双生灯" };
   dashboardItems.forEach((item, i) => {
-    const cx = 72 + i * 240;
+    const x = 72 + i * 240;
     const score = Number(d[item.key] ?? 5);
     const color = CARD_COLORS[item.key];
-    drawIcon(ctx, item.key, cx + 30, 1150, 48, color);
+    drawIcon(ctx, item.key, x + 30, 1172, 48, color);
     ctx.fillStyle = "#2f3756";
     ctx.font = `800 52px ${font}`;
-    ctx.fillText(String(score), cx + 76, 1170);
+    ctx.fillText(String(score), x + 76, 1192);
     ctx.fillStyle = "#4f5570";
     ctx.font = `500 26px ${font}`;
-    ctx.fillText(`${item.label} · ${cardIcons[item.key]}`, cx, 1226);
+    ctx.fillText(`${item.label} · ${cardIcons[item.key]}`, x, 1240);
   });
 
   if (life.problem) {
     const old = Math.round(life.problem.gravity / 10);
     ctx.fillStyle = "#2f3756";
     ctx.font = `600 30px ${font}`;
-    ctx.fillText(`缠绕藤里，${10 - old} 成是可以动手的新芽`, 72, 1290);
+    ctx.fillText(`缠绕藤里，${10 - old} 成是可以动手的新芽`, 72, 1298);
   }
   ctx.fillStyle = "#e8ddd0";
-  ctx.fillRect(72, 1322, W - 144, 2);
+  ctx.fillRect(72, 1326, W - 144, 2);
   ctx.fillStyle = "#2f3756";
   ctx.font = `700 30px ${font}`;
   ctx.fillText("测测你的小星球", 72, 1376);
@@ -806,6 +811,7 @@ function celebrate(id, score) {
 // ---------- camera modes ----------
 
 function setFollow() {
+  document.body.classList.remove("is-intro");
   if (cam.mode === "intro") {
     // Landing: hold wide for a beat, then dive, and squash the traveler on touchdown.
     cam.dive = clockNow;
@@ -1147,7 +1153,7 @@ function updateLabels() {
     if (sx < 44 || sx > w - 44 || sy < 120 || sy > h - 24) visible = false;
     // The intro copy already names every stop; labels appear once the traveler lands.
     if (cam.mode === "intro") visible = false;
-    label.el.style.opacity = visible ? "1" : "0";
+    label.el.style.opacity = visible ? (label.el.classList.contains("is-locked") ? "0.65" : "1") : "0";
     if (visible) {
       label.el.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
     }

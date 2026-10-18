@@ -171,6 +171,8 @@
       transition: opacity 0.2s;
     }
 
+    body.is-intro .quest-card, body.is-intro #overviewBtn { visibility: hidden; }
+    .obj-label.is-locked { background: rgba(255, 251, 244, 0.7); }
     body.is-overview .obj-label { font-size: 11px; padding: 3px 8px; }
     body.is-overview .obj-label small { display: none; }
     .obj-label small { display: block; font-size: 11px; font-weight: 500; color: #5c5866; text-align: center; margin-top: 1px; }
@@ -452,7 +454,7 @@
     }
   </style>
 </head>
-<body>
+<body class="is-intro">
   <canvas id="scene" aria-label="你的小星球 3D 场景"></canvas>
   <div class="labels" id="labels"></div>
 

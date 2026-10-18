@@ -136,15 +136,17 @@ export function createBackdrop() {
       ctx.fillRect(0, 0, w, h);
       const unit = Math.min(w, h);
       ctx.fillStyle = `#${colors.sunRing.getHexString()}`;
-      ctx.globalAlpha = 0.45;
+      ctx.globalAlpha = 0.45 * (colors.sunStrength ?? 1);
       ctx.beginPath();
       ctx.arc(w * 0.8, h * 0.17, unit * 0.15, 0, Math.PI * 2);
       ctx.fill();
-      ctx.globalAlpha = 1;
+      // On an overcast (low play) sky the sun fades back behind the haze.
+      ctx.globalAlpha = 0.35 + 0.65 * (colors.sunStrength ?? 1);
       ctx.fillStyle = `#${colors.sun.getHexString()}`;
       ctx.beginPath();
       ctx.arc(w * 0.8, h * 0.17, unit * 0.095, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = 1;
       const tint = `#${colors.cloud.getHexString()}`;
       const shade = `#${colors.cloudShade.getHexString()}`;
       clouds.forEach(([fx, fy, fw]) => drawCloud(ctx, w * fx, h * fy, Math.max(w, h * 0.6) * fw, tint, shade));

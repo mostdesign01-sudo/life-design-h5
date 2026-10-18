@@ -270,7 +270,7 @@ function buildLanterns() {
   const halos = [];
   [-1, 1].forEach(side => {
     const pivot = new THREE.Group();
-    pivot.position.x = side * 0.6;
+    pivot.position.x = side * 0.85;
     pivot.add(box(0.16, 0.08, 0.16, toon(PAL.stone), 0, 0.04, 0));
     pivot.add(box(0.09, 0.82, 0.09, cream, 0, 0.45, 0));
     pivot.add(box(0.22, 0.04, 0.04, wood, -side * 0.08, 0.89, 0));
@@ -286,14 +286,14 @@ function buildLanterns() {
     glassMats.push(glassMat);
   });
   // Ten separate bulbs, one per point of the love score, so the count can be read at a glance.
-  const bulbGeo = new THREE.SphereGeometry(0.038, 14, 10);
+  const bulbGeo = new THREE.SphereGeometry(0.05, 16, 12);
   const bulbs = [];
   for (let i = 0; i < 10; i += 1) {
     const bulb = new THREE.Mesh(bulbGeo, new THREE.MeshToonMaterial({ color: "#b7b0aa", emissive: "#ffc861", emissiveIntensity: 1, gradientMap: TOON_RAMP }));
     group.add(bulb);
     bulbs.push(bulb);
   }
-  addShadowDisc(group, 0.7, 0.1);
+  addShadowDisc(group, 0.95, 0.1);
   return { group, posts, glassMats, halos, bulbs };
 }
 
@@ -586,7 +586,7 @@ export function createWorld(canvas) {
     spring: { dir: dirAt(34, 120), radius: 1.2 / R, labelHeight: 1.35, focus: 1.1, parts: [spring.group] },
     workshop: { dir: dirAt(40, 190), radius: 0.85 / R, labelHeight: 1.75, focus: 1.3, parts: [workshop.group] },
     bench: { dir: benchDir, radius: 0.55 / R, labelHeight: 0.9, focus: 0.9, parts: [bench.group] },
-    lanterns: { dir: dirAt(32, 52), radius: 0.65 / R, labelHeight: 1.2, focus: 1.05, parts: [lanterns.group] },
+    lanterns: { dir: dirAt(32, 52), radius: 0.9 / R, labelHeight: 1.2, focus: 1.05, parts: [lanterns.group] },
     vine: { dir: dirAt(40, 255), radius: 0.6 / R, labelHeight: 1.1, focus: 1.2, parts: [vine.group] },
     sign: { dir: dirAt(20, 305), radius: 0.3 / R, labelHeight: 1.4, focus: 0.9, parts: [sign.group] }
   };
@@ -695,8 +695,8 @@ export function createWorld(canvas) {
   const screen = { w: window.innerWidth, h: window.innerHeight };
 
   function paintBackdrop(play) {
-    Object.keys(skyColors).forEach(key => skyColors[key].set(skyDull[key]).lerp(new THREE.Color(skyVivid[key]), play));
-    backdrop.paint(screen.w, screen.h, skyColors);
+    Object.keys(skyVivid).forEach(key => skyColors[key].set(skyDull[key]).lerp(new THREE.Color(skyVivid[key]), play));
+    backdrop.paint(screen.w, screen.h, { ...skyColors, sunStrength: THREE.MathUtils.clamp(play, 0, 1) });
   }
   const bulbOn = new THREE.Color("#ffc861");
   const bulbOff = new THREE.Color("#000000");
@@ -856,7 +856,7 @@ export function createWorld(canvas) {
       const fromEdge = Math.min(i, lanterns.bulbs.length - 1 - i);
       const rank = fromEdge * 2 + (i < lanterns.bulbs.length / 2 ? 0 : 1);
       const on = rank < lit ? 1 : 0;
-      bulb.material.color.set(on ? "#ffc65c" : "#b7b0aa");
+      bulb.material.color.set(on ? "#ffc65c" : "#6f6a78");
       bulb.material.emissive.copy(bulbOff).lerp(bulbOn, on);
       // Kept below the bloom threshold so each bulb stays a distinct dot rather than one streak.
       bulb.material.emissiveIntensity = 0.18;
@@ -931,14 +931,16 @@ export function createWorld(canvas) {
     post.render(cam);
   }
 
-  // Render one frame from `cam` into a square image (for the postcard).
-  function snapshot(cam, size) {
+  // Render one frame from `cam` into a square image (for the postcard), on a flat background
+  // tinted by the play score instead of the illustrated sky.
+  function snapshot(cam, size, background) {
     renderer.setPixelRatio(1);
     renderer.setSize(size, size, false);
     post.setSize(size, size, 1);
-    backdrop.paint(size, size, skyColors);
+    const previous = scene.background;
+    scene.background = background;
     post.render(cam);
-    backdrop.paint(screen.w, screen.h, skyColors);
+    scene.background = previous;
     const out = document.createElement("canvas");
     out.width = out.height = size;
     out.getContext("2d").drawImage(renderer.domElement, 0, 0, size, size);
@@ -948,6 +950,7 @@ export function createWorld(canvas) {
 
   return {
     renderer, scene, camera, objects, farPlanets, blockers,
+    skyTint: () => skyColors.middle.clone(),
     setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust, celebrate, setDiaryReady, setNearCull
   };
 }
