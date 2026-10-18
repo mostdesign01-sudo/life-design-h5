@@ -171,6 +171,8 @@
       transition: opacity 0.2s;
     }
 
+    body.is-overview .obj-label { font-size: 11px; padding: 3px 8px; }
+    body.is-overview .obj-label small { display: none; }
     .obj-label small { display: block; font-size: 10px; font-weight: 500; color: rgba(35, 29, 43, 0.62); text-align: center; margin-top: 1px; }
     .obj-label.is-done::after { content: " ✓"; color: var(--teal); }
     /* The next unvisited stop breathes, so a first-time visitor knows where to go. */
@@ -407,7 +409,7 @@
     .intro p { margin: 0 0 22px; line-height: 1.8; font-size: 14px; max-width: 360px; color: #4d5778; animation: rise 0.7s 0.65s both cubic-bezier(.2,.8,.2,1); }
     .intro .btn-primary { animation: rise 0.7s 0.8s both cubic-bezier(.2,.8,.2,1); }
     .intro .btn-primary { flex: none; min-width: 180px; min-height: 52px; font-size: 16px; border-radius: 999px; }
-    .intro small { margin-top: 14px; font-size: 12px; color: #5d6584; line-height: 1.6; max-width: 360px; }
+    .intro small { margin-top: 14px; font-size: 12px; color: #4a5272; line-height: 1.6; max-width: 360px; }
 
     .loading {
       position: fixed;

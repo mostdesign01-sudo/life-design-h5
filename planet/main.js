@@ -173,9 +173,10 @@ function applyView(cameraToSet, height, aspect) {
 
 orbitDirection(cam.dir);
 // Intro framing: the planet sits in the upper part of the screen, clear of the title block below.
-const INTRO_LOOK_Y = -5.2;
+const PORTRAIT = window.innerWidth < window.innerHeight;
+const INTRO_LOOK_Y = PORTRAIT ? -5.2 : -4.2;
 function introView() {
-  return viewHeightFor(22, 17);
+  return PORTRAIT ? viewHeightFor(22, 17) : 26;
 }
 // Start exactly on the intro framing so the very first frame is already a finished picture.
 cam.look.set(0, INTRO_LOOK_Y, 0);
@@ -415,9 +416,9 @@ function nextQuestLabel() {
 
 function problemFeedback(p) {
   if (p.gravity > p.designable) {
-    return "这里有明显的<strong>重力问题</strong>成分：有些现实不是靠你更努力就会改变。真正可设计的部分，是你在这些现实边界内如何重新定向、选择场景、降低试错成本。先把不能推动的墙认出来，不是认输，是节省生命。";
+    return "有些现实不是靠更努力就能改变的。先认出这堵墙，不再和它较劲，然后看看在墙内还能往哪儿走。认出它不是认输，是省下力气。";
   }
-  return "这个问题里已经有不少<strong>可设计空间</strong>。下一步不是立刻找唯一答案，而是把它拆成可以试的小问题：你能找谁聊、能做什么小实验、能用什么证据判断它是否更靠近你。";
+  return "这件事里，能动手的部分不少。不用马上找到唯一答案，先挑一小步试试：找一个人聊聊，或者做一个这周就能完成的小实验。";
 }
 
 function coachHTML(coach) {
@@ -484,7 +485,6 @@ function showProblemResult(requestCoach) {
   const render = coach => `
     <div class="sheet-kicker">缠绕藤 · 核心困扰</div>
     <h2 class="sheet-title" id="sheetTitle">${escapeHTML(p.label)}</h2>
-    <p class="sheet-story">老藤是你拔不动的那部分：接受它，别再和墙拔河。旁边发光的新芽，是你可以动手设计的部分。</p>
     ${radarHTML(p)}
     <p class="reaction">${problemFeedback(p)}</p>
     ${coachHTML(coach)}
@@ -593,8 +593,8 @@ function showPostcard() {
   const html = `
     <div class="sheet-kicker">星球日记 · 明信片</div>
     <h2 class="sheet-title" id="sheetTitle">这是你的星球，现在的样子。</h2>
+    <p class="sheet-story">长按图片保存。这只是这一季的快照，过一阵再来，它会因为你做的小事而变。</p>
     <div class="postcard-wrap"><img src="${url}" alt="我的小星球明信片"></div>
-    <p class="sheet-story" style="margin-top:10px">手机上可以长按图片保存。它不是判决，只是这一季的快照：过一阵再来，星球会因为你做的小事而变。</p>
     <div class="sheet-actions is-sticky">
       <a class="btn btn-primary" href="${url}" download="我的小星球.png">保存明信片</a>
       <button class="btn btn-ghost" type="button" data-action="edit">改写日记</button>
@@ -691,21 +691,25 @@ function drawIcon(ctx, key, x, y, s, color) {
     ctx.lineTo(s * 0.46, -s * 0.03);
     ctx.fill();
   } else if (key === "play") {
+    // A setting sun with rays.
     ctx.beginPath();
-    ctx.arc(0, s * 0.2, s * 0.38, Math.PI, 0);
+    ctx.arc(0, s * 0.18, s * 0.26, Math.PI, 0);
     ctx.fill();
-    ctx.fillRect(-s * 0.5, s * 0.26, s, s * 0.08);
-  } else {
-    [-1, 1].forEach(side => {
-      ctx.fillRect(side * s * 0.34 - s * 0.05, -s * 0.4, s * 0.1, s * 0.85);
+    ctx.lineCap = "round";
+    for (let i = 0; i < 5; i += 1) {
+      const a = Math.PI + (i + 0.5) * (Math.PI / 5);
       ctx.beginPath();
-      ctx.arc(side * s * 0.2, -s * 0.28, s * 0.1, 0, Math.PI * 2);
-      ctx.fill();
-    });
+      ctx.moveTo(Math.cos(a) * s * 0.36, s * 0.18 + Math.sin(a) * s * 0.36);
+      ctx.lineTo(Math.cos(a) * s * 0.5, s * 0.18 + Math.sin(a) * s * 0.5);
+      ctx.stroke();
+    }
+    ctx.fillRect(-s * 0.5, s * 0.24, s, s * 0.08);
+  } else {
     ctx.beginPath();
-    ctx.moveTo(-s * 0.2, -s * 0.2);
-    ctx.quadraticCurveTo(0, s * 0.05, s * 0.2, -s * 0.2);
-    ctx.stroke();
+    ctx.moveTo(0, s * 0.42);
+    ctx.bezierCurveTo(-s * 0.55, s * 0.02, -s * 0.38, -s * 0.48, 0, -s * 0.16);
+    ctx.bezierCurveTo(s * 0.38, -s * 0.48, s * 0.55, s * 0.02, 0, s * 0.42);
+    ctx.fill();
   }
   ctx.restore();
 }
@@ -717,13 +721,13 @@ function makePostcard() {
   const H = 1440;
   const shotCam = camera.clone();
   shotCam.clearViewOffset();
-  // Three-quarter view of the lived-in side, close enough that the buildings read at thumbnail size.
-  const side = new THREE.Vector3().crossVectors(POLE, SUN).normalize();
-  const view = POLE.clone().multiplyScalar(0.62).addScaledVector(SUN, 0.62).addScaledVector(side, 0.3).normalize();
-  shotCam.position.copy(view).multiplyScalar(CAM_DISTANCE);
+  // The whole planet against its sky (which carries the play score), seen from the lived-in side.
+  const yaw = Math.atan2(POLE.x, POLE.z) - 0.35;
+  const pitch = 0.62;
+  shotCam.position.set(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)).multiplyScalar(CAM_DISTANCE);
   shotCam.up.set(0, 1, 0);
-  shotCam.lookAt(POLE.clone().multiplyScalar(R * 0.62));
-  applyView(shotCam, 11, 1);
+  shotCam.lookAt(0, 0.4, 0);
+  applyView(shotCam, 16.5, 1);
   const shot = world.snapshot(shotCam, W);
 
   const card = document.createElement("canvas");
@@ -733,21 +737,21 @@ function makePostcard() {
   ctx.fillStyle = "#fbf3e8";
   ctx.fillRect(0, 0, W, H);
   // Crop the square render to a band between the title and the scores, softened at both edges.
-  ctx.drawImage(shot, 0, 150, W, 800, 0, 320, W, 800);
-  const fadeTop = ctx.createLinearGradient(0, 320, 0, 430);
+  ctx.drawImage(shot, 0, 110, W, 840, 0, 300, W, 840);
+  const fadeTop = ctx.createLinearGradient(0, 300, 0, 430);
   fadeTop.addColorStop(0, "#fbf3e8");
   fadeTop.addColorStop(1, "rgba(251,243,232,0)");
   ctx.fillStyle = fadeTop;
-  ctx.fillRect(0, 320, W, 110);
-  const fadeBottom = ctx.createLinearGradient(0, 1020, 0, 1120);
+  ctx.fillRect(0, 300, W, 130);
+  const fadeBottom = ctx.createLinearGradient(0, 1040, 0, 1140);
   fadeBottom.addColorStop(0, "rgba(251,243,232,0)");
   fadeBottom.addColorStop(1, "#fbf3e8");
   ctx.fillStyle = fadeBottom;
-  ctx.fillRect(0, 1020, W, 100);
+  ctx.fillRect(0, 1040, W, 100);
 
   const font = '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
   const date = new Date();
-  ctx.fillStyle = "#6b6f86";
+  ctx.fillStyle = "#4f5570";
   ctx.font = `500 28px ${font}`;
   ctx.fillText(`星球 ${planet.code} · ${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`, 72, 104);
   const [line1, line2] = cardTitle();
@@ -766,7 +770,7 @@ function makePostcard() {
     ctx.fillStyle = "#2f3756";
     ctx.font = `800 52px ${font}`;
     ctx.fillText(String(score), cx + 76, 1192);
-    ctx.fillStyle = "#5d6380";
+    ctx.fillStyle = "#4f5570";
     ctx.font = `500 26px ${font}`;
     ctx.fillText(`${item.label} · ${cardIcons[item.key]}`, cx, 1252);
   });
@@ -776,7 +780,7 @@ function makePostcard() {
   ctx.fillStyle = "#2f3756";
   ctx.font = `700 32px ${font}`;
   ctx.fillText("测测你的小星球", 72, 1370);
-  ctx.fillStyle = "#5d6380";
+  ctx.fillStyle = "#4f5570";
   ctx.font = `400 26px ${font}`;
   ctx.fillText(SHARE_HOST, 72, 1410);
   return card.toDataURL("image/png");
@@ -799,10 +803,20 @@ function setFollow() {
     // Landing: hold wide for a beat, then dive, and squash the traveler on touchdown.
     cam.dive = clockNow;
     react.land = clockNow + 1.15;
+    // Land facing the first unvisited stop, with the camera behind, so the next step is in view.
+    const first = objects[nextQuest()?.id];
+    if (first) {
+      const face = tangentToward(player.dir, first.dir);
+      if (face.lengthSq() > 0.5) {
+        player.facing.copy(face);
+        camForward.copy(face);
+      }
+    }
     sound.whoosh();
     setTimeout(() => sound.land(), 1150);
   }
   cam.mode = "follow";
+  document.body.classList.remove("is-overview");
   els.overviewBtn.textContent = "看全貌";
   els.intro.classList.add("is-hidden");
 }
@@ -810,6 +824,7 @@ function setFollow() {
 function setOverview() {
   closeSheet();
   cam.mode = "overview";
+  document.body.classList.add("is-overview");
   autoTarget = null;
   const p = player.dir.clone().add(SUN.clone().multiplyScalar(0.2)).normalize();
   orbit.yaw = Math.atan2(p.x, p.z);
@@ -841,8 +856,8 @@ els.overviewBtn.addEventListener("click", () => {
 els.startBtn.addEventListener("click", () => {
   sound.start();
   setFollow();
+  // The hint stays until the visitor first moves or taps something.
   els.hint.style.opacity = "1";
-  setTimeout(() => { els.hint.style.opacity = "0"; }, 7000);
 });
 
 const desired = { dir: new THREE.Vector3(), look: new THREE.Vector3(), up: new THREE.Vector3(), view: 18 };
@@ -857,7 +872,7 @@ function updateCamera(dt, time) {
     orbitDirection(desired.dir);
     desired.look.set(0, cam.mode === "intro" ? INTRO_LOOK_Y : 0, 0);
     desired.up.set(0, 1, 0);
-    desired.view = cam.mode === "intro" ? introView() : viewHeightFor(17 * orbit.scale, 15 * orbit.scale);
+    desired.view = cam.mode === "intro" ? introView() : viewHeightFor(17 * orbit.scale, 17.5 * orbit.scale);
   } else if (cam.mode === "focus" && objects[cam.focusId]) {
     const obj = objects[cam.focusId];
     const od = obj.dir;
@@ -873,12 +888,14 @@ function updateCamera(dt, time) {
       // Look from the far side, slightly off-axis, so the traveler stands facing the object in frame.
       away.applyAxisAngle(od, 2.4);
     }
-    desired.dir.copy(od).multiplyScalar(Math.sin(ELEVATION)).addScaledVector(away, Math.cos(ELEVATION));
-    desired.look.copy(objPos).addScaledVector(od, 0.5 * obj.focus);
+    // The bench is about the sky, so that stop looks up from low down and lets the sky fill the frame.
+    const elevation = obj.id === "bench" ? THREE.MathUtils.degToRad(10) : ELEVATION;
+    desired.dir.copy(od).multiplyScalar(Math.sin(elevation)).addScaledVector(away, Math.cos(elevation));
+    desired.look.copy(objPos).addScaledVector(od, (obj.id === "bench" ? 1.4 : 0.5) * obj.focus);
     desired.up.copy(od);
     // Fit the object into the part of the screen the sheet leaves free.
     const free = THREE.MathUtils.clamp(1 - (sheetState ? els.sheet.offsetHeight : 0) / window.innerHeight, 0.45, 1);
-    desired.view = viewHeightFor(3.6 * obj.focus, 3.4 * obj.focus) * (0.35 + 0.65 * free);
+    desired.view = viewHeightFor(3.6 * obj.focus, 3.6 * obj.focus) * (0.5 + 0.5 * free);
     const punch = (time - react.hop) / 0.6;
     if (punch > 0 && punch < 1) desired.view *= 1 - Math.sin(punch * Math.PI) * 0.08;
   } else {

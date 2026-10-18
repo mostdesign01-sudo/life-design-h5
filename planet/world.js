@@ -683,10 +683,10 @@ export function createWorld(canvas) {
   const groundDry = new THREE.Color("#d8c48f");
   const windowCalm = new THREE.Color("#ffcc7a");
   const windowHot = new THREE.Color("#ff5a3a");
-  const smokeDark = new THREE.Color("#3a3644");
+  const smokeDark = new THREE.Color("#4b4658");
   const smokeLight = new THREE.Color("#ffffff");
   const murky = new THREE.Color("#8f7b55");
-  const clear = new THREE.Color("#5fd2d6");
+  const clear = new THREE.Color("#78c8c2");
   // Backdrop colours for a joyful (vivid) and a joyless (dull) play score.
   const skyVivid = { top: "#ffc9a8", middle: "#ffb8b0", bottom: "#9ec3f0", sun: "#fff6d8", sunRing: "#ffd59e", cloud: "#ffffff", cloudShade: "#f3d8e6" };
   const skyDull = { top: "#b9bcc6", middle: "#c4c6cd", bottom: "#a6abb8", sun: "#d4d5d9", sunRing: "#c9cad0", cloud: "#d9dbe1", cloudShade: "#b9bcc7" };
@@ -769,7 +769,7 @@ export function createWorld(canvas) {
       p.mesh.position.z += p.drift.y * dt;
       p.mesh.scale.setScalar(0.6 + k * (1.6 + (1 - w) * 1.8));
       p.mesh.material.color.copy(smokeLight).lerp(smokeDark, THREE.MathUtils.smoothstep(1 - w, 0.25, 0.8));
-      p.mesh.material.opacity = Math.sin(k * Math.PI) * (0.55 + (1 - w) * 0.4);
+      p.mesh.material.opacity = Math.min(1, Math.sin(k * Math.PI) * 1.6) * 0.92;
     });
   }
 
