@@ -36,12 +36,12 @@
     #promo .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 8px; background: #c95a26; }
     #promo .dot { position: absolute; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; background: #c95a26; border: 4px solid #fff; box-shadow: 0 2px 8px rgba(35, 29, 43, 0.25); }
     #promo .scrim { position: absolute; inset: 0; background: linear-gradient(180deg, #fbf3e8, #f6ecde); }
-    #promo .card { position: absolute; left: 50%; top: 174px; width: 340px; margin-left: -170px; transform-origin: 50% 0; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(35, 29, 43, 0.28); }
+    #promo .card { position: absolute; left: 50%; top: 188px; width: 400px; margin-left: -200px; transform-origin: 50% 0; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(35, 29, 43, 0.28); }
     #promo .card img { display: block; width: 100%; }
-    #promo .link { position: absolute; left: 0; right: 0; top: 632px; text-align: center; }
+    #promo .link { position: absolute; left: 0; right: 0; top: 732px; text-align: center; }
     #promo .link b { display: inline-block; padding: 7px 18px 7px 22px; border-radius: 999px; background: #a9471a; color: #fff; font-family: -apple-system, "PingFang SC", "WenQuanYi Zen Hei", sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.2em; box-shadow: 0 6px 18px rgba(169, 71, 26, 0.28); }
     #promo .card-tag { position: absolute; top: 14px; right: 14px; padding: 3px 10px 3px 12px; border-radius: 999px; background: #c95a26; color: #fff; font-family: -apple-system, "PingFang SC", "WenQuanYi Zen Hei", sans-serif; font-size: 13px; letter-spacing: 0.2em; }
-    #promo .cta { position: absolute; left: 0; right: 0; top: 80px; text-align: center; }
+    #promo .cta { position: absolute; left: 0; right: 0; top: 88px; text-align: center; }
     #promo .cta b { display: block; font-weight: 600; font-size: 36px; letter-spacing: 0.16em; padding-left: 0.16em; text-shadow: 0 0 18px rgba(251, 243, 232, 0.9); }
     #promo .cta span { display: block; margin-top: 8px; font-family: -apple-system, "PingFang SC", "WenQuanYi Zen Hei", sans-serif; font-size: 12px; letter-spacing: 0.28em; color: #4f5570; text-shadow: 0 0 10px rgba(251, 243, 232, 0.9); }
   `;
