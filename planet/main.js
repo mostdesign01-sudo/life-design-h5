@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { createWorld, buildTraveler, surfaceRadius, POLE, SUN, R } from "./world.js";
 import {
   loadLifeState, saveLifeState, loadPlanetState, savePlanetState,
-  markCompleted, classifyProblem, requestCoreProblemCoach, dashboardItems
+  markCompleted, classifyProblem, requestCoreProblemCoach, dashboardItems, hasRiskSignal, SUPPORT_TEXT
 } from "./state.js";
 import { createSound } from "./sound.js";
 
@@ -348,6 +348,21 @@ els.sheetBody.addEventListener("click", event => {
   } else sheetState.actions?.[action]?.(event);
 });
 
+// A reply to the coach question saves as it is typed, in the state shared with the questionnaire.
+els.sheetBody.addEventListener("input", event => {
+  const stepId = event.target.dataset?.followup;
+  if (!stepId) return;
+  life.answers.followups = life.answers.followups || {};
+  life.answers.followups[stepId] = {
+    question: life.aiCoach?.[stepId]?.result?.question || "",
+    answer: event.target.value.trim(),
+    answeredAt: new Date().toISOString()
+  };
+  saveLifeState(life);
+  // A reply that raises a signal swaps the card for the help lines straight away.
+  if (hasRiskSignal(event.target.value)) showProblemResult(false);
+});
+
 function scoreBand(score) {
   return score <= 3 ? 0 : score <= 6 ? 1 : 2;
 }
@@ -438,6 +453,24 @@ function problemFeedback(p) {
   return "这件事里，能动手的部分不少。不用马上找到唯一答案，先挑一小步试试：找一个人聊聊，或者做一个这周就能完成的小实验。";
 }
 
+function supportHTML(coach = {}) {
+  return `
+    <div class="coach is-support">
+      <p><strong>${escapeHTML(coach.headline || "先照顾好你自己")}</strong></p>
+      <p>${escapeHTML(coach.reflection || "你写下的话里有很重的东西。人生设计可以先放一放，此刻你的感受更重要，你不需要一个人扛着。")}</p>
+      <p>${escapeHTML(SUPPORT_TEXT)}</p>
+      <p class="coach-hint">如果这只是一句随口的话，可以忽略这段，继续往下走。</p>
+    </div>
+  `;
+}
+
+// Help lines lead the sheet: from the AI when it judged this a moment for support, otherwise from the
+// page's own check, so they show even when the AI can't be reached.
+function supportFor(coach) {
+  if (coach?.result?.safety === "support") return supportHTML(coach.result);
+  return hasRiskSignal([life.answers.coreProblem, life.answers.followups?.coreProblem?.answer]) ? supportHTML() : "";
+}
+
 function coachHTML(coach) {
   if (!coach) return "";
   if (coach.status === "loading") {
@@ -446,6 +479,8 @@ function coachHTML(coach) {
   // When the AI can't be reached, leave it out: the fixed feedback above stands on its own.
   if (coach.status === "error") return "";
   const c = coach.result || {};
+  if (c.safety === "support") return "";
+  const reply = life.answers.followups?.coreProblem?.answer || "";
   return `
     <div class="coach">
       <span class="coach-label">AI 关键追问</span>
@@ -454,6 +489,12 @@ function coachHTML(coach) {
       ${c.question ? `<p><strong>追问：</strong>${escapeHTML(c.question)}</p>` : ""}
       ${c.prototype ? `<p><strong>小原型：</strong>${escapeHTML(c.prototype)}</p>` : ""}
       ${c.watchout ? `<p><strong>提醒：</strong>${escapeHTML(c.watchout)}</p>` : ""}
+      ${c.question ? `
+      <div class="coach-reply">
+        <label for="followupInput">回答这个追问（选填）</label>
+        <textarea id="followupInput" data-followup="coreProblem" maxlength="400" placeholder="想到什么写什么，一两句也行。后面的追问和 AI 深度蓝图会接着这条线往下想。">${escapeHTML(reply)}</textarea>
+        <span class="coach-hint">自动保存</span>
+      </div>` : ""}
     </div>
   `;
 }
@@ -499,16 +540,25 @@ function openProblem() {
 
 function showProblemResult(requestCoach) {
   const p = life.problem;
-  const render = coach => `
+  const actionsHTML = `
+    <div class="sheet-actions">
+      <button class="btn btn-ghost" type="button" data-action="rewrite">改写</button>
+      <button class="btn btn-primary" type="button" data-action="next">${nextQuestLabel()}</button>
+    </div>
+  `;
+  // In that moment the support card stands alone, without the vine's analysis.
+  const render = coach => supportFor(coach) ? `
+    <div class="sheet-kicker">缠绕藤 · 核心困扰</div>
+    <h2 class="sheet-title" id="sheetTitle">先停一下。</h2>
+    ${supportFor(coach)}
+    ${actionsHTML}
+  ` : `
     <div class="sheet-kicker">缠绕藤 · 核心困扰</div>
     <h2 class="sheet-title" id="sheetTitle">${escapeHTML(p.label)}</h2>
     ${radarHTML(p)}
     <p class="reaction">${problemFeedback(p)}</p>
     ${coachHTML(coach)}
-    <div class="sheet-actions">
-      <button class="btn btn-ghost" type="button" data-action="rewrite">改写</button>
-      <button class="btn btn-primary" type="button" data-action="next">${nextQuestLabel()}</button>
-    </div>
+    ${actionsHTML}
   `;
   const actions = {
     rewrite() {

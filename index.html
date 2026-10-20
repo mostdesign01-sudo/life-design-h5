@@ -890,6 +890,47 @@
       background: rgba(255, 255, 255, 0.52);
     }
 
+    .coach-card.is-support {
+      border-color: rgba(226, 91, 77, 0.35);
+      background: rgba(255, 246, 242, 0.9);
+    }
+
+    .coach-card.is-support .coach-label {
+      background: #b5473b;
+    }
+
+    .coach-hint {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .coach-reply {
+      display: grid;
+      gap: 6px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed rgba(33, 33, 33, 0.16);
+    }
+
+    .coach-reply label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .coach-reply textarea {
+      width: 100%;
+      min-height: 76px;
+      padding: 9px 11px;
+      border: 1px solid rgba(33, 33, 33, 0.18);
+      border-radius: 12px;
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.6;
+      resize: vertical;
+      background: #fff;
+    }
+
     .warning {
       display: none;
       border: 2px solid var(--sketch);
@@ -2133,6 +2174,10 @@
     const AI_REPORT_STORAGE_KEY = "lifeDesignAiReportV1";
     const AI_USER_STORAGE_KEY = "lifeDesignAnonymousUserV1";
     const AI_COACH_STEPS = new Set(["coreProblem", "lifeview", "energy", "odyssey"]);
+    // Plain signals of hopelessness or self-harm; the same list is in server/index.js and planet/state.js.
+    // When one appears the page shows help lines itself, so they are there even if the AI can't be reached.
+    const RISK_PATTERN = /自杀|轻生|不想活|活不下去|活着没(?:有)?意思|活着没(?:有)?意义|结束(?:自己的)?生命|想死|去死|死了算了|不如死|自残|自伤|割腕|跳楼(?!价)|伤害自己/;
+    const SUPPORT_TEXT = "如果你现在很难受，或有伤害自己的念头，可以先联系一个信任的人，或拨打全国心理援助热线 12356、北京心理危机研究与干预中心 010-82951332（24 小时）。有紧急危险时，请立刻拨打 110 或 120。";
 
     const phases = [
       { key: "here", label: "你在这里" },
@@ -2726,6 +2771,50 @@
       return { [stepId]: answers[stepId] };
     }
 
+    // Everything the user told us before this step, plus earlier coach notes and the user's replies,
+    // so the coach can connect threads across steps instead of judging one answer in isolation.
+    function coachContextForStep(stepId) {
+      const answers = state.answers || {};
+      const index = steps.findIndex(item => item.id === stepId);
+      const focus = coachInputForStep(stepId);
+      const earlierAnswers = {};
+      steps.slice(0, index).forEach(item => {
+        const value = answers[item.id];
+        if (value === undefined || value === "" || item.id in focus) return;
+        earlierAnswers[item.id] = value;
+      });
+      const earlierCoach = steps.slice(0, index).map(item => coachNote(item.id)).filter(Boolean);
+      return { earlierAnswers, earlierCoach };
+    }
+
+    // One finished coach card, with whatever the user wrote back under its question.
+    function coachNote(stepId) {
+      const coach = state.aiCoach?.[stepId];
+      if (!AI_COACH_STEPS.has(stepId) || coach?.status !== "done" || !coach.result || coach.result.safety === "support") return null;
+      return {
+        stepId,
+        headline: coach.result.headline || "",
+        question: coach.result.question || "",
+        reply: state.answers.followups?.[stepId]?.answer || ""
+      };
+    }
+
+    function hasRiskSignal(value) {
+      return RISK_PATTERN.test(typeof value === "string" ? value : JSON.stringify(value || ""));
+    }
+
+    function supportCard(coach = {}) {
+      return `
+        <div class="coach-card is-support">
+          <span class="coach-label">先停一下</span>
+          <p class="coach-title">${escapeHTML(coach.headline || "先照顾好你自己")}</p>
+          <p>${escapeHTML(coach.reflection || "你写下的话里有很重的东西。人生设计可以先放一放，此刻你的感受更重要，你不需要一个人扛着。")}</p>
+          <p>${escapeHTML(SUPPORT_TEXT)}</p>
+          <p class="coach-hint">如果这只是一句随口的话，可以忽略这段，继续往下走。</p>
+        </div>
+      `;
+    }
+
     function coachSignature(stepId) {
       return hashText(JSON.stringify(coachInputForStep(stepId)));
     }
@@ -2734,7 +2823,7 @@
       return AI_COACH_STEPS.has(step.id);
     }
 
-    function renderCoachFeedback(coachState) {
+    function renderCoachFeedback(coachState, stepId) {
       if (!coachState) return "";
       if (coachState.status === "loading") {
         return `
@@ -2753,6 +2842,8 @@
         `;
       }
       const coach = coachState.result || {};
+      if (coach.safety === "support") return supportCard(coach);
+      const reply = state.answers.followups?.[stepId]?.answer || "";
       return `
         <div class="coach-card">
           <span class="coach-label">AI 关键追问</span>
@@ -2761,6 +2852,12 @@
           <p><strong>追问：</strong>${escapeHTML(coach.question || "")}</p>
           <p><strong>小原型：</strong>${escapeHTML(coach.prototype || "")}</p>
           <p><strong>提醒：</strong>${escapeHTML(coach.watchout || "")}</p>
+          ${coach.question ? `
+          <div class="coach-reply">
+            <label for="followup-${stepId}">回答这个追问（选填）</label>
+            <textarea id="followup-${stepId}" data-followup="${stepId}" maxlength="400" placeholder="想到什么写什么，一两句也行。下一站的追问和最后的 AI 深度蓝图会接着这条线往下想。">${escapeHTML(reply)}</textarea>
+            <span class="coach-hint">自动保存</span>
+          </div>` : ""}
         </div>
       `;
     }
@@ -2768,7 +2865,17 @@
     function updateStepFeedback(step) {
       const base = makeFeedback(step);
       const coach = shouldUseAiCoach(step) ? state.aiCoach?.[step.id] : null;
-      state.feedback[step.id] = `${base}${renderCoachFeedback(coach)}`;
+      // Help lines stand alone, without the step's analysis: from the AI when it judged this a moment
+      // for support, otherwise from the page's own check, so they show even when the AI can't be reached.
+      if (coach?.status === "done" && coach.result?.safety === "support") {
+        state.feedback[step.id] = supportCard(coach.result);
+        return;
+      }
+      if (hasRiskSignal([state.answers[step.id], state.answers.followups?.[step.id]?.answer])) {
+        state.feedback[step.id] = supportCard();
+        return;
+      }
+      state.feedback[step.id] = `${base}${renderCoachFeedback(coach, step.id)}`;
     }
 
     function submitCurrentStep() {
@@ -3309,6 +3416,7 @@
         answers: state.answers,
         problemRadar: state.problem || classifyProblem(state.answers.coreProblem || ""),
         fixedReportText,
+        coachNotes: steps.map(item => coachNote(item.id)).filter(Boolean),
         request: {
           goal: "请基于结构化回答生成一份更深入、更具体、更个性化的设计人生蓝图。",
           outputLanguage: "zh-CN",
@@ -3323,6 +3431,7 @@
         stepId,
         generatedAt: new Date().toISOString(),
         answers: coachInputForStep(stepId),
+        context: coachContextForStep(stepId),
         problemRadar: state.problem || classifyProblem(state.answers.coreProblem || "")
       };
     }
@@ -3537,6 +3646,24 @@
       render();
       showToast("已重新开始");
     }
+
+    // Replies to a coach question save as the user types; the cached feedback is refreshed without a
+    // re-render so the textarea keeps its focus.
+    els.feedbackBox.addEventListener("input", event => {
+      const stepId = event.target.dataset?.followup;
+      if (!stepId) return;
+      state.answers.followups = state.answers.followups || {};
+      state.answers.followups[stepId] = {
+        question: state.aiCoach?.[stepId]?.result?.question || "",
+        answer: event.target.value.trim(),
+        answeredAt: new Date().toISOString()
+      };
+      const step = steps.find(item => item.id === stepId);
+      if (step) updateStepFeedback(step);
+      saveState(true);
+      // A reply that raises a signal swaps the card for the help lines straight away.
+      if (step && hasRiskSignal(event.target.value)) renderFeedback(step);
+    });
 
     els.mainButton.addEventListener("click", submitCurrentStep);
     els.backButton.addEventListener("click", moveBack);

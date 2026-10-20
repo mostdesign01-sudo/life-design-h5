@@ -6,6 +6,15 @@ const AI_ENDPOINT_STORAGE_KEY = "lifeDesignAiEndpointV1";
 const DEFAULT_AI_ENDPOINT = "https://api.mostdesign.cn/api/analyze-life-design";
 const AI_USER_STORAGE_KEY = "lifeDesignAnonymousUserV1";
 
+// Plain signals of hopelessness or self-harm; the same list is in index.html and server/index.js.
+// When one appears the planet shows help lines itself, so they are there even if the AI can't be reached.
+const RISK_PATTERN = /自杀|轻生|不想活|活不下去|活着没(?:有)?意思|活着没(?:有)?意义|结束(?:自己的)?生命|想死|去死|死了算了|不如死|自残|自伤|割腕|跳楼(?!价)|伤害自己/;
+export const SUPPORT_TEXT = "如果你现在很难受，或有伤害自己的念头，可以先联系一个信任的人，或拨打全国心理援助热线 12356、北京心理危机研究与干预中心 010-82951332（24 小时）。有紧急危险时，请立刻拨打 110 或 120。";
+
+export function hasRiskSignal(value) {
+  return RISK_PATTERN.test(typeof value === "string" ? value : JSON.stringify(value || ""));
+}
+
 // Must match the order of `steps` in index.html.
 const STEP_ORDER = ["dashboard", "coreProblem", "reverseConsent", "reverseTuesday", "workview", "lifeview", "flow", "energy", "anchor", "odyssey"];
 
@@ -165,6 +174,8 @@ export async function requestCoreProblemCoach(state) {
         stepId: "coreProblem",
         generatedAt: new Date().toISOString(),
         answers: input,
+        // Nothing comes before this stop but the dashboard, which is already in the answers.
+        context: { earlierAnswers: {}, earlierCoach: [] },
         problemRadar: state.problem || classifyProblem(state.answers.coreProblem || "")
       })
     });

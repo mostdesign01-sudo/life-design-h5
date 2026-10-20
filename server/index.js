@@ -25,6 +25,8 @@ const ACTIVATION_CODES = (process.env.ACTIVATION_CODES || "")
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "usage-db.json");
 const IP_HASH_SECRET = process.env.IP_HASH_SECRET || "replace-this-secret-on-server";
+// Bearer token for GET /api/stats. Without one, stats can only be read on the server itself.
+const STATS_TOKEN = process.env.STATS_TOKEN || "";
 
 const rateLimitBuckets = new Map();
 const promptPath = path.join(__dirname, "..", "prompts", "life-design-system-prompt.md");
@@ -214,6 +216,18 @@ function statsSummary() {
 
 normalizeActivationCodes();
 
+// Stats hold usage logs and anonymous ids. With STATS_TOKEN set they need that bearer token; without
+// it, only a request made on the server itself (not one passed through the reverse proxy) may read them.
+function canReadStats(req) {
+  if (STATS_TOKEN) {
+    const given = Buffer.from(String(req.headers.authorization || ""));
+    const expected = Buffer.from(`Bearer ${STATS_TOKEN}`);
+    return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+  }
+  const address = req.socket.remoteAddress || "";
+  return !req.headers["x-forwarded-for"] && ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(address);
+}
+
 function corsHeaders(origin) {
   const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || "*";
   return {
@@ -315,23 +329,58 @@ function buildUserPrompt(payload) {
     "【固定模板初版报告】",
     payload.fixedReportText || "",
     "",
+    "【关键追问和用户回应】",
+    coachNotesText(payload.coachNotes),
+    "",
     "请按系统提示输出 Markdown。"
   ].join("\n");
 }
 
+const STEP_NAMES = {
+  dashboard: "四个仪表盘",
+  coreProblem: "核心困扰",
+  reverseConsent: "反向推演",
+  reverseTuesday: "不改变的周二",
+  workview: "工作观",
+  lifeview: "人生观",
+  flow: "心流时刻",
+  energy: "能量",
+  anchor: "执念",
+  odyssey: "奥德赛计划"
+};
+
+// Earlier coach notes and the user's own replies to them, one line each.
+function coachNotesText(notes) {
+  if (!Array.isArray(notes) || !notes.length) return "（还没有）";
+  return notes.slice(0, 8).map(note => {
+    const name = STEP_NAMES[note?.stepId] || String(note?.stepId || "");
+    const reply = limitText(note?.reply, 300);
+    return `- ${name}：AI 的观察「${limitText(note?.headline, 30)}」；追问「${limitText(note?.question, 90)}」；用户回应：${reply ? `「${reply}」` : "（未回应）"}`;
+  }).join("\n");
+}
+
 function buildCoachPrompt(payload) {
+  const context = payload.context && typeof payload.context === "object" ? payload.context : {};
   return [
     "你正在一个中文 H5 里扮演斯坦福人生设计师。现在只做一次关键节点追问，不要写完整报告。",
     "你的任务：温暖但犀利地指出一个关键观察，再给一个追问和一个低成本原型动作。",
+    "你能看到用户在前面几站的回答，以及之前的追问和用户的回应。如果本步的回答和前面的内容有呼应或矛盾，优先把这条线点出来，可以引用用户自己的原话（不超过 15 个字）。不要重复之前已经问过的追问。",
+    "如果用户文字里有明显的绝望、自伤或轻生信号，不做人生设计分析：safety 写 \"support\"，headline 和 reflection 只做温和的接住，question 问用户身边有没有可以马上联系的人；其他情况 safety 写 \"ok\"。",
     "必须输出严格 JSON，不要 Markdown，不要代码块。",
-    "JSON 字段固定为：headline, reflection, question, prototype, watchout。",
+    "JSON 字段固定为：headline, reflection, question, prototype, watchout, safety。",
     "长度限制：headline 不超过 18 个汉字；reflection 不超过 90 个汉字；question 不超过 70 个汉字；prototype 不超过 70 个汉字；watchout 不超过 60 个汉字。",
     "",
-    `【当前步骤】${payload.stepId}`,
+    `【当前步骤】${STEP_NAMES[payload.stepId] || payload.stepId}`,
     `【本步关注】${COACH_STEP_FOCUS[payload.stepId]}`,
     "",
-    "【用户回答 JSON】",
+    "【本步回答 JSON】",
     JSON.stringify(payload.answers || {}, null, 2),
+    "",
+    "【此前各站的回答 JSON】",
+    JSON.stringify(context.earlierAnswers || {}, null, 2),
+    "",
+    "【此前的关键追问和用户回应】",
+    coachNotesText(context.earlierCoach),
     "",
     "【问题雷达】",
     JSON.stringify(payload.problemRadar || {}, null, 2)
@@ -415,8 +464,47 @@ function normalizeCoach(raw, fallbackText) {
     reflection: limitText(source.reflection || fallbackText || "这里值得再停一下：真正的问题可能不在表层选项，而在你一直试图保护的东西。", 120),
     question: limitText(source.question || "如果只允许你改变一个最小动作，你会先动哪一块？", 90),
     prototype: limitText(source.prototype || "找一位相关经历的人聊 20 分钟，只问真实一天、代价和转折点。", 90),
-    watchout: limitText(source.watchout || "不要把一次原型误读成终身决定。", 70)
+    watchout: limitText(source.watchout || "不要把一次原型误读成终身决定。", 70),
+    safety: source.safety === "support" ? "support" : "ok"
   };
+}
+
+// ---------- safety ----------
+// Plain signals of hopelessness or self-harm. When one appears, the service answers with support and
+// help lines instead of life-design advice, without calling the model or spending the user's quota.
+// The same list lives in index.html and planet/state.js for when this service can't be reached.
+const RISK_PATTERN = /自杀|轻生|不想活|活不下去|活着没(?:有)?意思|活着没(?:有)?意义|结束(?:自己的)?生命|想死|去死|死了算了|不如死|自残|自伤|割腕|跳楼(?!价)|伤害自己/;
+const SUPPORT_LINES = "全国心理援助热线 12356；北京心理危机研究与干预中心 010-82951332（24 小时）；如果有紧急危险，请立刻拨打 110 或 120，或者让身边信任的人陪着你。";
+
+function hasRiskSignal(value) {
+  return RISK_PATTERN.test(typeof value === "string" ? value : JSON.stringify(value || ""));
+}
+
+function supportCoach() {
+  return {
+    headline: "先照顾好你自己",
+    reflection: "你写下的话里有很重的东西。人生设计可以先放一放，此刻你的感受更重要，你不需要一个人扛着。",
+    question: "现在身边有没有一个你可以马上联系的人？",
+    prototype: `今天先做一件事：联系一个信任的人，或拨打心理援助热线。${SUPPORT_LINES}`,
+    watchout: "如果这只是一句随口的话，可以忽略这段，继续往下走。",
+    safety: "support"
+  };
+}
+
+function supportMarkdown() {
+  return [
+    "## 先照顾好你自己",
+    "",
+    "你写下的回答里，有一些很重的话。在这种时候，人生设计、五年计划都可以先放一放，你此刻的感受更重要。",
+    "",
+    "如果你现在很难受，或者有伤害自己的念头，请先找人一起扛：",
+    "",
+    "- 全国心理援助热线：12356",
+    "- 北京心理危机研究与干预中心：010-82951332（24 小时）",
+    "- 有紧急危险时：立刻拨打 110 或 120，或者让身边信任的人陪着你",
+    "",
+    "等你感觉稳一些，这份蓝图随时可以再生成。如果那只是一句随口的话，把那一句改写之后再生成就好。"
+  ].join("\n");
 }
 
 async function callCoachModel(payload) {
@@ -435,8 +523,15 @@ async function callCoachModel(payload) {
   if (!content.trim()) {
     throw Object.assign(new Error("模型没有返回关键追问内容"), { status: 502 });
   }
+  const coach = normalizeCoach(parseJsonObject(content), content);
+  // The model judged this a moment for support: keep its words, but always give the help lines.
+  if (coach.safety === "support") {
+    const fixed = supportCoach();
+    coach.prototype = fixed.prototype;
+    coach.watchout = fixed.watchout;
+  }
   return {
-    coach: normalizeCoach(parseJsonObject(content), content),
+    coach,
     model: data.model || AI_MODEL,
     usage: data.usage || null
   };
@@ -453,6 +548,11 @@ async function handleAnalyze(req, res, origin) {
   const body = await readRequestBody(req);
   const payload = JSON.parse(body || "{}");
   validatePayload(payload);
+  if (hasRiskSignal([payload.answers, payload.coachNotes])) {
+    logUsage({ feature: "deep_report", userId, ipHash: ipHash(ip), status: "support" });
+    sendJson(res, 200, { analysisMarkdown: supportMarkdown(), model: "safety-check", safety: "support", quota: quotaFor(userId) }, origin);
+    return;
+  }
   const startedAt = Date.now();
   const consumed = consumeQuota(userId);
   try {
@@ -497,6 +597,13 @@ async function handleCoach(req, res, origin) {
   const body = await readRequestBody(req);
   const payload = JSON.parse(body || "{}");
   validateCoachPayload(payload);
+  // This step's own input and the user's replies to earlier questions; an earlier answer that raised a
+  // signal was already met with support at its own step.
+  if (hasRiskSignal([payload.answers, (payload.context?.earlierCoach || []).map(note => note?.reply)])) {
+    logUsage({ feature: "coach_step", stepId: payload.stepId, userId, ipHash: ipHash(ip), status: "support" });
+    sendJson(res, 200, { coach: supportCoach(), model: "safety-check", quota: quotaFor(userId) }, origin);
+    return;
+  }
   const startedAt = Date.now();
   const consumed = consumeCoachQuota(userId);
   try {
@@ -578,6 +685,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && req.url === "/api/stats") {
+    if (!canReadStats(req)) {
+      sendJson(res, 401, { error: "需要统计令牌" }, origin);
+      return;
+    }
     sendJson(res, 200, { ok: true, stats: statsSummary() }, origin);
     return;
   }
