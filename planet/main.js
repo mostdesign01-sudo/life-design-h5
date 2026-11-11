@@ -1549,12 +1549,13 @@ function updateSeeThrough() {
     return;
   }
   const head = traveler.group.position.clone().addScaledVector(player.dir, 0.95);
-  const clip = head.clone().applyMatrix4(camera.matrixWorldInverse);
+  // Mesh shaders use vViewPosition = -mvPosition, so depth in front of the camera is positive.
+  const viewZ = -head.clone().applyMatrix4(camera.matrixWorldInverse).z;
   const projected = head.project(camera);
   const size = world.renderer.getDrawingBufferSize(new THREE.Vector2());
   const cx = (projected.x * 0.5 + 0.5) * size.x;
   const cy = (projected.y * 0.5 + 0.5) * size.y;
-  world.setSeeThrough(cx, cy, Math.max(size.x, size.y) * 0.09, clip.z);
+  world.setSeeThrough(cx, cy, Math.max(size.x, size.y) * 0.12, viewZ);
 }
 
 function frame() {

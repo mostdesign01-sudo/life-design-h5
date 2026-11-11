@@ -381,7 +381,7 @@ export function createWorld(canvas) {
     sun.intensity = mood.lightPower;
     scene.fog.color.copy(shared.uHaze.value);
     clouds.materials.forEach(m => m.color.copy(cloudDull).lerp(cloudVivid, mood.vivid));
-    atmosphere.material.uniforms.uStrength.value = 0.45 + mood.vivid * 0.25;
+    atmosphere.material.uniforms.uStrength.value = 0.28 + mood.vivid * 0.18;
 
     const knotScale = current.problem < 0.5 ? 0.45 : 0.4 + current.gravity * 1.2;
     vine.knot.scale.setScalar(knotScale);

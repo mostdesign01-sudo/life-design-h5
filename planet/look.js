@@ -86,7 +86,7 @@ export function createPost(renderer, scene) {
   }
   let target = makeTarget();
 
-  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.5, 0.5, 0.95);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.42, 0.55, 0.97);
   let bloomOn = hdr;
   const finish = new THREE.RawShaderMaterial({
     uniforms: FinishShader.uniforms,
