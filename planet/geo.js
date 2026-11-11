@@ -124,7 +124,7 @@ export function seeThrough(material) {
           float holeD = distance(gl_FragCoord.xy, uHole.xy) / uHole.z;
           if (holeD < 1.0) {
             float holeN = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));
-            if (smoothstep(0.45, 1.0, holeD) < holeN + 0.02) discard;
+            if (smoothstep(0.72, 1.0, holeD) < holeN + 0.02) discard;
           }
         }`);
   });

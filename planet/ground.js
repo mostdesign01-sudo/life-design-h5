@@ -38,8 +38,8 @@ const GROUND_GLSL = /* glsl */`
     col *= 1.0 + mottling;
 
     float off = abs(acos(clamp(dot(d, vec3(${POLE.x.toFixed(5)}, ${POLE.y.toFixed(5)}, ${POLE.z.toFixed(5)})), -1.0, 1.0)) - ${PATH_ANGLE.toFixed(5)});
-    float edge = 0.030 + (vnoise(d * 40.0) - 0.5) * 0.012;
-    float path = 1.0 - smoothstep(edge, edge + 0.012, off + (n - 0.5) * 0.008);
+    float edge = 0.026 + (vnoise(d * 40.0) - 0.5) * 0.010;
+    float path = 1.0 - smoothstep(edge, edge + 0.028, off + (n - 0.5) * 0.006);
     vec3 dirt = vec3(0.851, 0.725, 0.541) * (1.0 + (n - 0.5) * 0.08);
     col = mix(col, dirt, path);
 
