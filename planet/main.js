@@ -1302,7 +1302,8 @@ function occludedByPlanet(point) {
 function updateLabels() {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  labelEls.forEach(label => {
+  const nextId = nextQuest()?.id;
+  const candidates = labelEls.map(label => {
     let visible = !sheetState;
     if (label.far) {
       const p = farPlanets.find(item => item.id === label.id);
@@ -1321,9 +1322,22 @@ function updateLabels() {
     if (sx < 44 || sx > w - 44 || sy < 120 || sy > h - 24) visible = false;
     // The intro copy already names every stop; labels appear once the traveler lands.
     if (cam.mode === "intro") visible = false;
-    label.el.style.opacity = visible ? (label.el.classList.contains("is-locked") ? "0.65" : "1") : "0";
-    if (visible) {
-      label.el.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
+    const rank = label.far ? 0
+      : label.id === nextId ? 5
+        : label.id === lastNearId ? 4
+          : isDone(label.id) ? 1 : 3;
+    return { label, visible, sx, sy, rank };
+  });
+  candidates.sort((a, b) => b.rank - a.rank);
+  const placed = [];
+  candidates.forEach(item => {
+    if (item.visible && placed.some(other => Math.hypot(other.sx - item.sx, other.sy - item.sy) < 58)) {
+      item.visible = false;
+    }
+    if (item.visible) placed.push(item);
+    item.label.el.style.opacity = item.visible ? (item.label.el.classList.contains("is-locked") ? "0.65" : "1") : "0";
+    if (item.visible) {
+      item.label.el.style.transform = `translate(${item.sx}px, ${item.sy}px) translate(-50%, -100%)`;
     }
   });
 }
@@ -1555,7 +1569,7 @@ function updateSeeThrough() {
   const size = world.renderer.getDrawingBufferSize(new THREE.Vector2());
   const cx = (projected.x * 0.5 + 0.5) * size.x;
   const cy = (projected.y * 0.5 + 0.5) * size.y;
-  world.setSeeThrough(cx, cy, Math.max(size.x, size.y) * 0.12, viewZ);
+  world.setSeeThrough(cx, cy, Math.max(size.x, size.y) * 0.16, viewZ);
 }
 
 function frame() {
