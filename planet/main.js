@@ -97,10 +97,23 @@ const els = {
 let life = loadLifeState();
 const planet = loadPlanetState();
 
-const world = createWorld(els.canvas);
+let world;
+try {
+  world = createWorld(els.canvas);
+} catch (error) {
+  console.error(error);
+  els.loading.innerHTML = '<p>这颗星球在你的设备上没能点亮。</p><p><a href="./index.html" style="color:#fff">先去完整问卷</a></p>';
+  throw error;
+}
 const { scene, camera, objects, farPlanets } = world;
 const traveler = buildTraveler();
 scene.add(traveler.group);
+els.canvas.addEventListener("webglcontextlost", event => {
+  event.preventDefault();
+  els.loading.classList.remove("is-hidden");
+  els.loading.innerHTML = '<p>画面中断了。</p><button class="btn btn-primary" type="button" id="reloadPlanet">点一下重新点亮</button>';
+  document.getElementById("reloadPlanet")?.addEventListener("click", () => location.reload());
+});
 const sound = createSound();
 // Start fetching the display face early; the postcard canvas draws with it.
 document.fonts?.load('600 32px "Planet Serif"');
@@ -180,9 +193,9 @@ function applyView(cameraToSet, aspect) {
 orbitDirection(cam.dir);
 // Intro framing: the planet sits in the upper part of the screen, clear of the title block below.
 const PORTRAIT = window.innerWidth < window.innerHeight;
-const INTRO_LOOK_Y = PORTRAIT ? -6 : -4.2;
+const INTRO_LOOK_Y = PORTRAIT ? -4.4 : -3.1;
 function introView() {
-  return PORTRAIT ? viewHeightFor(22, 17) : 26;
+  return PORTRAIT ? viewHeightFor(16.2, 12.5) : 19.1;
 }
 // Start exactly on the intro framing so the very first frame is already a finished picture.
 cam.look.set(0, INTRO_LOOK_Y, 0);
@@ -308,10 +321,47 @@ function standSpot(obj) {
   return obj.dir.clone().multiplyScalar(Math.cos(dist)).addScaledVector(t, Math.sin(dist)).normalize();
 }
 
+function seatOnBench() {
+  const bench = objects.bench.parts[0];
+  bench.updateMatrixWorld(true);
+  const seat = new THREE.Vector3(0, -0.06, 0.07);
+  bench.localToWorld(seat);
+  traveler.group.position.copy(seat);
+  traveler.group.quaternion.copy(bench.quaternion);
+  traveler.legs.forEach((leg, i) => { leg.rotation.x = -1.45; leg.rotation.z = (i ? -1 : 1) * 0.06; });
+  traveler.arms.forEach((arm, i) => { arm.rotation.x = -0.55; arm.rotation.z = (i ? 1 : -1) * 0.12; });
+  traveler.body.position.y = 0;
+  traveler.body.scale.set(1, 1, 1);
+  traveler.head.rotation.set(-0.08, 0, 0);
+  player.sitting = true;
+  player.dir.copy(objects.bench.dir);
+}
+
+function standFromBench() {
+  if (!player.sitting) return;
+  player.sitting = false;
+  traveler.legs.forEach(leg => { leg.rotation.z = 0; });
+  traveler.arms.forEach(arm => { arm.rotation.z = 0; });
+  const front = new THREE.Vector3(0, 0, 1).applyQuaternion(objects.bench.parts[0].quaternion);
+  const od = objects.bench.dir;
+  const away = front.sub(od.clone().multiplyScalar(front.dot(od))).normalize();
+  const dist = objects.bench.reach + 0.08;
+  player.dir.copy(od).multiplyScalar(Math.cos(dist)).addScaledVector(away, Math.sin(dist)).normalize();
+  player.facing.copy(tangentToward(player.dir, od));
+  camForward.copy(player.facing);
+}
+
 function openSheet(state, html) {
   sheetState = state;
-  player.standTarget = standSpot(objects[state.focusId]);
-  player.standTime = 2.5;
+  player.sitting = false;
+  if (state.focusId === "bench") {
+    player.standTarget = null;
+    player.standTime = 0;
+    seatOnBench();
+  } else {
+    player.standTarget = standSpot(objects[state.focusId]);
+    player.standTime = 2.5;
+  }
   player.lookTarget = objects[state.focusId]?.dir || null;
   els.sheetBody.innerHTML = html;
   if (!els.sheet.classList.contains("is-open")) sound.open();
@@ -332,6 +382,7 @@ function closeSheet() {
   els.sheet.classList.remove("is-open");
   els.sheetBackdrop.classList.remove("is-open");
   if (cam.mode === "focus") cam.mode = "follow";
+  if (state.focusId === "bench") standFromBench();
   if (state.onClose) state.onClose();
 }
 
@@ -795,7 +846,7 @@ function makePostcard(linkText = SHARE_HOST) {
   const yaw = Math.atan2(POLE.x, POLE.z) - 0.5;
   const pitch = 0.62;
   const view = new THREE.Vector3(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw));
-  shotCam.position.copy(view).multiplyScalar(distanceFor(16.2));
+  shotCam.position.copy(view).multiplyScalar(distanceFor(11.9));
   shotCam.up.set(0, 1, 0);
   shotCam.lookAt(0, 0, 0);
   applyView(shotCam, 1);
@@ -987,7 +1038,7 @@ function updateCamera(dt, time) {
     orbitDirection(desired.dir);
     desired.look.set(0, cam.mode === "intro" ? INTRO_LOOK_Y : 0, 0);
     desired.up.set(0, 1, 0);
-    desired.view = cam.mode === "intro" ? introView() : viewHeightFor(17 * orbit.scale, 17.5 * orbit.scale);
+    desired.view = cam.mode === "intro" ? introView() : viewHeightFor(12.5 * orbit.scale, 12.8 * orbit.scale);
   } else if (cam.mode === "focus" && objects[cam.focusId]) {
     const obj = objects[cam.focusId];
     const od = obj.dir;
@@ -1016,15 +1067,15 @@ function updateCamera(dt, time) {
     if (near) desired.look.lerp(tmpV.copy(travelerPos).addScaledVector(od, 0.5), 0.3);
     // Fit them into the part of the screen the HUD and the sheet leave free.
     const free = THREE.MathUtils.clamp(1 - ((sheetState ? els.sheet.offsetHeight : 0) + HUD_HEIGHT) / window.innerHeight, 0.4, 1);
-    const fit = Math.max(3.6 * obj.focus, gap * 1.9 + 1.4);
-    desired.view = viewHeightFor(fit, fit) * (1 + (1 - free) * 0.55);
+    const fit = Math.max(2.9 * obj.focus, gap * 1.7 + 1.15);
+    desired.view = viewHeightFor(fit, fit) * (1 + (1 - free) * 0.45);
     const punch = (time - react.hop) / 0.6;
     if (punch > 0 && punch < 1) desired.view *= 1 - Math.sin(punch * Math.PI) * 0.08;
   } else {
     desired.dir.copy(up).multiplyScalar(Math.sin(ELEVATION)).addScaledVector(camForward, -Math.cos(ELEVATION));
     desired.look.copy(base).addScaledVector(up, 0.5).addScaledVector(camForward, 0.6);
     desired.up.copy(up);
-    desired.view = viewHeightFor(6.5 * cam.zoom, 4.2 * cam.zoom);
+    desired.view = viewHeightFor(5.0 * cam.zoom, 3.2 * cam.zoom);
   }
   // Dive: a short anticipation (the wide view eases out a little), then a slower, smooth descent.
   const diveT = time - (cam.dive ?? -10);
@@ -1066,6 +1117,7 @@ function updateCamera(dt, time) {
 
 function resolveCollisions() {
   world.blockers.forEach(b => {
+    if (player.sitting && b.dir === objects.bench.dir) return;
     const angle = player.dir.angleTo(b.dir);
     if (angle < b.radius) {
       const t = tangentToward(b.dir, player.dir);
@@ -1092,6 +1144,13 @@ const moveDir = new THREE.Vector3();
 const right = new THREE.Vector3();
 
 function updatePlayer(dt, time) {
+  if (player.sitting) {
+    seatOnBench();
+    traveler.eyes?.forEach(eye => { eye.scale.y = Math.sin(time * 0.8) > 0.97 ? 0.08 : 1.25; });
+    updateNearby();
+    return;
+  }
+
   let ix = input.x;
   let iy = input.y;
   if (input.keys.has("KeyA") || input.keys.has("ArrowLeft")) ix -= 1;
@@ -1106,32 +1165,36 @@ function updatePlayer(dt, time) {
 
   if (canMove && mag > 0.05) {
     autoTarget = null;
+    player.groundTarget = null;
     right.crossVectors(camForward, player.dir);
     moveDir.copy(right).multiplyScalar(ix).addScaledVector(camForward, iy).normalize();
-    speed = 2.6 * mag;
+    speed = 2.0 * mag;
   } else if (sheetState && player.standTarget) {
     // Step aside while a sheet is open, then turn to face the object.
     player.standTime -= dt;
     if (player.dir.angleTo(player.standTarget) > 0.01 && player.standTime > 0) {
       tangentToward(player.dir, player.standTarget, moveDir);
-      speed = 1.6;
+      speed = 1.5;
     } else {
       player.standTarget = null;
     }
   } else if (canMove && autoTarget) {
     const obj = objects[autoTarget];
     tangentToward(player.dir, obj.dir, moveDir);
-    speed = 2.8;
+    speed = 2.15;
     if (player.dir.angleTo(obj.dir) <= obj.reach) {
       const id = autoTarget;
       autoTarget = null;
       speed = 0;
       openObject(id);
     } else {
-      // Let the camera swing round behind the walk so the target stays in view.
       camForward.lerp(moveDir, 1 - Math.exp(-dt * 1.5));
       reproject(camForward, player.dir);
     }
+  } else if (canMove && player.groundTarget) {
+    tangentToward(player.dir, player.groundTarget, moveDir);
+    speed = 2.0;
+    if (player.dir.angleTo(player.groundTarget) < 0.03) player.groundTarget = null;
   }
 
   if (sheetState && !player.standTarget && player.lookTarget) {
@@ -1143,7 +1206,6 @@ function updatePlayer(dt, time) {
   if (speed > 0) {
     const before = player.dir.clone();
     movePlayer(moveDir, Math.min(speed * dt, player.standTarget ? player.dir.angleTo(player.standTarget) * R : Infinity));
-    // Sliding along a blocker: walk in the direction actually travelled.
     const travelled = tangentToward(before, player.dir);
     if (travelled.lengthSq() > 0.5) player.facing.lerp(travelled, 1 - Math.exp(-dt * 12));
     reproject(player.facing, player.dir);
@@ -1157,20 +1219,21 @@ function updatePlayer(dt, time) {
   traveler.group.quaternion.setFromRotationMatrix(tmpM);
   traveler.group.position.copy(up).multiplyScalar(surfaceRadius(up) - 0.01);
 
-  const s = Math.min(1, player.speed / 2.6);
+  // One stride is about 0.6 world units of arc, so the feet plant without sliding.
+  const s = Math.min(1, player.speed / 2.0);
   const prevStep = Math.sin(player.phase);
-  player.phase += dt * (3 + player.speed * 3.2);
+  player.phase += dt * Math.max(player.speed, 0.001) * Math.PI / 0.6 * (s > 0.05 ? 1 : 0);
   if (s > 0.4 && Math.sign(prevStep) !== Math.sign(Math.sin(player.phase))) {
     world.kickDust(traveler.group.position, player.dir);
     sound.step();
   }
-  const swing = Math.sin(player.phase) * 0.75 * s;
+  const swing = Math.sin(player.phase) * 0.9 * s;
   traveler.legs[0].rotation.x = swing;
   traveler.legs[1].rotation.x = -swing;
   traveler.arms[0].rotation.x = -swing * 0.7;
   traveler.arms[1].rotation.x = swing * 0.7;
+  traveler.group.rotateX(-0.12 * s);
   const idle = 1 - s;
-  // Hop on a confirmed answer; squash on landing from the dive; breathe and glance around when idle.
   const hopT = (time - react.hop) / 0.45;
   const hop = hopT > 0 && hopT < 1 ? Math.sin(hopT * Math.PI) : 0;
   const landT = time - react.land;
@@ -1185,6 +1248,7 @@ function updatePlayer(dt, time) {
   traveler.pack.position.y = 0.58 + Math.abs(Math.cos(player.phase)) * 0.025 * s;
   traveler.pack.rotation.x = -0.08 * s;
   traveler.charm.rotation.z = Math.sin(player.phase) * 0.5 * s + Math.sin(time * 1.7) * 0.08;
+  traveler.eyes?.forEach(eye => { eye.scale.y = Math.sin(time * 0.8) > 0.97 ? 0.08 : 1.25; });
 
   updateNearby();
 }
@@ -1273,13 +1337,51 @@ Object.values(objects).forEach(obj => obj.hit.forEach(mesh => { hitList.push(mes
 farPlanets.forEach(p => p.hit.forEach(mesh => { hitList.push(mesh); hitOwner.set(mesh, { type: "far", planet: p }); }));
 
 function handleTap(clientX, clientY) {
+  // Labels stay pointer-events:none so dragging still rotates the view; hit-test their boxes here.
+  for (const label of labelEls) {
+    if (label.far || label.el.style.opacity === "0") continue;
+    const r = label.el.getBoundingClientRect();
+    if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+      goTo(label.id);
+      return;
+    }
+  }
   const ndc = new THREE.Vector2((clientX / window.innerWidth) * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
   const hit = raycaster.intersectObjects(hitList, false)[0];
-  if (!hit) return;
-  const owner = hitOwner.get(hit.object);
-  if (owner.type === "object") goTo(owner.id);
-  else openFarPlanet(owner.planet);
+  if (hit) {
+    const owner = hitOwner.get(hit.object);
+    if (owner.type === "object") goTo(owner.id);
+    else openFarPlanet(owner.planet);
+    return;
+  }
+  // Soft screen-space proximity: a near miss on a prop still counts as a tap on it.
+  let best = null;
+  let bestDist = 48;
+  Object.values(objects).forEach(obj => {
+    const p = obj.dir.clone().multiplyScalar(R + obj.labelHeight * 0.35).project(camera);
+    if (p.z > 1) return;
+    const sx = (p.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-p.y * 0.5 + 0.5) * window.innerHeight;
+    const d = Math.hypot(sx - clientX, sy - clientY);
+    if (d < bestDist) { best = obj; bestDist = d; }
+  });
+  if (best) {
+    goTo(best.id);
+    return;
+  }
+  // Analytic hit on the planet sphere: walk to that point.
+  if (cam.mode !== "follow" || sheetState) return;
+  const origin = raycaster.ray.origin;
+  const dir = raycaster.ray.direction;
+  const b = origin.dot(dir);
+  const c = origin.lengthSq() - R * R;
+  const disc = b * b - c;
+  if (disc < 0) return;
+  const t = -b - Math.sqrt(disc);
+  if (t < 0) return;
+  player.groundTarget = origin.clone().addScaledVector(dir, t).normalize();
+  autoTarget = null;
 }
 
 const pointers = new Map();
@@ -1440,17 +1542,34 @@ function updateFocus() {
   world.setFocus(THREE.MathUtils.clamp(focusPoint.project(camera).y * 0.5 + 0.5, 0.1, 0.9));
 }
 
+function updateSeeThrough() {
+  if (!world.setSeeThrough) return;
+  if (cam.mode !== "follow" || player.sitting) {
+    world.setSeeThrough(0, 0, 0, 0);
+    return;
+  }
+  const head = traveler.group.position.clone().addScaledVector(player.dir, 0.95);
+  const clip = head.clone().applyMatrix4(camera.matrixWorldInverse);
+  const projected = head.project(camera);
+  const size = world.renderer.getDrawingBufferSize(new THREE.Vector2());
+  const cx = (projected.x * 0.5 + 0.5) * size.x;
+  const cy = (projected.y * 0.5 + 0.5) * size.y;
+  world.setSeeThrough(cx, cy, Math.max(size.x, size.y) * 0.09, clip.z);
+}
+
 function frame() {
   const rawDt = clock.getDelta();
   const dt = Math.min(rawDt, 0.05);
   const time = clock.elapsedTime;
   measure(rawDt, time);
+  if (pinnedQuality === null) world.noteFrameTime?.(rawDt * 1000);
   clockNow = time;
   world.update(dt, time);
   sound.tick(Number(life.answers.dashboard.play ?? 5) / 10);
   updatePlayer(dt, time);
   updateCamera(dt, time);
   updateFocus();
+  updateSeeThrough();
   world.render(camera, time);
   updateLabels();
   if (!started) {

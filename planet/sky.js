@@ -75,14 +75,14 @@ const MOODS = {
   day: {
     top: hex("#3a6cbf"), mid: hex("#7fb0e6"), horizon: hex("#ffe2b8"), bottom: hex("#f3e3d6"),
     cloudLit: hex("#fffaf0"), cloudShade: hex("#b4bbe0"), glow: hex("#ffe1a8"), sun: hex("#fff3d6"),
-    cover: 0.535, glowAmount: 0.7, sunAmount: 1.0, sunPower: 3.0,
-    light: hex("#ffe0b5"), lightPower: 2.75, skyLight: hex("#d6e6ff"), groundLight: hex("#7d9a55"), ambient: 0.95
+    cover: 0.58, glowAmount: 0.55, sunAmount: 1.0, sunPower: 2.4,
+    light: hex("#ffe0b5"), lightPower: 2.35, skyLight: hex("#d6e6ff"), groundLight: hex("#8aa466"), ambient: 1.15
   },
   dusk: {
     top: hex("#7a6fc0"), mid: hex("#f7a98c"), horizon: hex("#ff9a5c"), bottom: hex("#ffc39b"),
     cloudLit: hex("#ffb07a"), cloudShade: hex("#8a5f9e"), glow: hex("#ff8438"), sun: hex("#ffb060"),
-    cover: 0.5, glowAmount: 1.0, sunAmount: 1.0, sunPower: 3.4,
-    light: hex("#ffb878"), lightPower: 3.0, skyLight: hex("#f4cfd6"), groundLight: hex("#a08a5a"), ambient: 0.9
+    cover: 0.55, glowAmount: 0.85, sunAmount: 1.0, sunPower: 2.8,
+    light: hex("#ffb878"), lightPower: 2.55, skyLight: hex("#f4cfd6"), groundLight: hex("#a08a5a"), ambient: 1.05
   }
 };
 
@@ -144,7 +144,7 @@ export function buildSky(renderer) {
         // Clouds near the sun take its colour, and their thin edges light up.
         cloud = mix(cloud, uGlowColor * 1.08, pow(s, 2.5) * 0.65 * uGlow);
         cloud += uSunColor * thin * pow(s, 8.0) * 0.35 * uSunAmount;
-        col = mix(col, cloud, dens * 0.94);
+        col = mix(col, cloud, dens * 0.82);
 
         float disc = smoothstep(uSunSize - uSunSoft, uSunSize + uSunSoft, s) * (1.0 - dens * 0.85);
         col += uSunColor * pow(s, 220.0) * 0.5 * uSunAmount * (1.0 - dens * 0.6);

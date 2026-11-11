@@ -88,13 +88,12 @@
     }
 
     .quest-card {
-      background: var(--paper);
+      /* Solid paper: a live WebGL canvas behind backdrop-filter can drop the card's text on some GPUs. */
+      background: var(--paper-solid);
       border-radius: var(--radius);
       padding: 10px 12px;
       box-shadow: 0 10px 30px rgba(20, 10, 40, 0.25);
       max-width: 240px;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
     }
 
     .quest-head {

@@ -10,13 +10,13 @@
   const bench = world.objects.bench.parts[0];
   const sky = world.sky.material;
   const light = (() => { let found = null; world.scene.traverse(n => { if (!found && n.isDirectionalLight && n.castShadow) found = n; }); return found; })();
-  const SKY_SHADER = sky.fragmentShader;
-  // A smaller, crisper sun than the live sky's wide glow, so it stays a shape rather than a wash.
-  const STAGED_SHADER = SKY_SHADER
-    .replace("pow(s, 8.0) * 0.5", "pow(s, 24.0) * 0.28")
-    .replace("pow(s, 64.0) * 0.7", "pow(s, 300.0) * 0.3")
-    .replace("vec3(1.0, 0.96, 0.86) * 3.0", "vec3(1.0, 0.93, 0.78) * 1.15")
-    .replace("smoothstep(0.9988, 0.9994, s)", "smoothstep(0.99945, 0.9997, s)");
+  // Prefer the live uniforms (sun size / glow) so a staged shot does not need to rewrite the shader.
+  const skySaved = {
+    sunSize: sky.uniforms.uSunSize?.value,
+    sunSoft: sky.uniforms.uSunSoft?.value,
+    glow: sky.uniforms.uGlow?.value,
+    sunPower: sky.uniforms.uSunPower?.value
+  };
 
   // The backpack, set down against the bench's right leg: just the bag, no bedroll, ties or lamp.
   const pack = T.pack.clone(true);
@@ -29,10 +29,12 @@
   pack.visible = false;
   bench.add(pack);
 
-  // Grass, flowers and pebbles are the three big instanced scatters.
+  // Grass tufts, flowers and pebbles are the big instanced scatters (grass is split into chunks).
   const scatters = [];
   world.scene.traverse(n => {
-    if (n.isInstancedMesh && (n.count > 3000 || ["CircleGeometry", "IcosahedronGeometry"].includes(n.geometry.type))) scatters.push(n);
+    if (!n.isInstancedMesh) return;
+    const type = n.geometry.type;
+    if (n.count > 80 || ["CircleGeometry", "IcosahedronGeometry", "BufferGeometry"].includes(type)) scatters.push(n);
   });
   const ironMats = [];
   bench.traverse(n => { if (n.material && n.material.metalness > 0 && !ironMats.includes(n.material)) ironMats.push(n.material); });
@@ -77,8 +79,10 @@
       saved = { sun: sky.uniforms.uSunDir.value.clone(), light: light.position.clone(), visible: hidden().map(o => o.visible) };
       hidden().forEach(o => { o.visible = false; });
       ironMats.forEach(m => { m.metalness = 0; m.roughness = 1; });
-      sky.fragmentShader = STAGED_SHADER;
-      sky.needsUpdate = true;
+      if (sky.uniforms.uSunSize) sky.uniforms.uSunSize.value = 0.99955;
+      if (sky.uniforms.uSunSoft) sky.uniforms.uSunSoft.value = 0.0002;
+      if (sky.uniforms.uGlow) sky.uniforms.uGlow.value = Math.min(sky.uniforms.uGlow.value, 0.45);
+      if (sky.uniforms.uSunPower) sky.uniforms.uSunPower.value = 1.2;
       bench.scale.setScalar(props);
       T.group.scale.setScalar(props);
       T.pack.visible = false;
@@ -99,8 +103,10 @@
       if (!saved || held) return;
       hidden().forEach((o, i) => { o.visible = saved.visible[i]; });
       ironMats.forEach((m, i) => { [m.metalness, m.roughness] = ironSaved[i]; });
-      sky.fragmentShader = SKY_SHADER;
-      sky.needsUpdate = true;
+      if (sky.uniforms.uSunSize && skySaved.sunSize != null) sky.uniforms.uSunSize.value = skySaved.sunSize;
+      if (sky.uniforms.uSunSoft && skySaved.sunSoft != null) sky.uniforms.uSunSoft.value = skySaved.sunSoft;
+      if (sky.uniforms.uGlow && skySaved.glow != null) sky.uniforms.uGlow.value = skySaved.glow;
+      if (sky.uniforms.uSunPower && skySaved.sunPower != null) sky.uniforms.uSunPower.value = skySaved.sunPower;
       sky.uniforms.uSunDir.value.copy(saved.sun);
       light.position.copy(saved.light);
       bench.scale.setScalar(1);
@@ -133,7 +139,7 @@
       const back = fwd.addScaledVector(od, -fwd.dot(od)).normalize().negate();
       const e = elevation * Math.PI / 180;
       desired.dir.copy(od).multiplyScalar(Math.sin(e)).addScaledVector(back, Math.cos(e)).normalize();
-      desired.look.copy(od).multiplyScalar(6 + lookUp);
+      desired.look.copy(od).multiplyScalar(4.4 + lookUp);
       desired.up.copy(od);
       desired.view = view;
     }
