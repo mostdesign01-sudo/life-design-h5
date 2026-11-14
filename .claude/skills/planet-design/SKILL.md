@@ -24,19 +24,19 @@ A flat, Monument Valley-style version was tried and rejected: on a sphere covere
 
 ## Colour
 
-- The world palette is natural and warm: meadow greens (`MEADOW` in `planet/world.js`), warm woods, a terracotta roof, stone, clear teal water, and gold lamp light against a blue sky with a peach horizon.
+- The world palette is natural and warm: meadow greens (GPU ground ramp in `planet/ground.js`), warm woods, a terracotta roof, stone, clear teal water, and gold lamp light against a blue sky with a peach horizon. The planet radius is `R = 4.4` in `planet/geo.js` so props read against a curved horizon.
 - New objects use the same families. Keep accents rare: one warm light, one roof red. No neon or toy primaries.
 - The UI accent is `--accent` #c95a26 (white text on it passes 4.5:1).
 - Text contrast is at least 4.5:1 everywhere, including label subtitles and postcard captions. Check this when lightening anything grey.
 - Scores must change the world in a way you can read from a screenshot, pushed to both extremes:
-  - Play: sky golden or overcast, and the sun fades. Above about 7 the whole sky, top to horizon, slides into a pink-orange evening glow (`midDusk`, `topDusk`, `horizonDusk`, `bottomDusk`); to show it on camera, face away from the sun, because looking into it washes the sky out to cream.
+  - Play: sky golden or overcast, and the sun fades. Above about 7 the whole sky, top to horizon, slides into a pink-orange evening glow (`MOODS.dusk` in `planet/sky.js`). The bench stop frames the traveler seated, looking over the bench toward the sun.
   - Work: white or charcoal smoke, warm or red windows.
   - Health: clear or muddy water, mint or straw ground.
   - Love: N of 10 bulbs lit, gold against dark grey.
 
 ## Shape and materials
 
-- Build with `MeshStandardMaterial`, using rounded boxes (`RoundedBoxGeometry`) and the painted canvas textures in `planet/look.js` (wood, roof tiles, stone). Foliage uses vertex-coloured blobs, shaded from dark at the base to sunlit at the crown.
+- Build with `MeshStandardMaterial`, using rounded boxes (`RoundedBoxGeometry`) and the painted canvas textures in `planet/look.js` (wood, roof tiles, stone). Foliage uses merged lumpy crowns with height grade and soft overlap AO. The scene draws into one multisampled HDR target, then bloom and a single finish pass (tilt-shift, grade, ACES).
 - Objects cast soft shadows and sit on a contact blob (`addBlob`).
 - Keep detail where the eye lands: the props and the traveler. The ground stays calm.
 - The traveler is a small person, not a doll: long legs, a smaller head, muted jacket and beanie, no blush.

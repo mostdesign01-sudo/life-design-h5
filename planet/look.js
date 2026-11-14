@@ -1,95 +1,148 @@
 import * as THREE from "three";
-import { EffectComposer } from "../vendor/three-addons/postprocessing/EffectComposer.js";
-import { RenderPass } from "../vendor/three-addons/postprocessing/RenderPass.js";
-import { ShaderPass } from "../vendor/three-addons/postprocessing/ShaderPass.js";
+import { FullScreenQuad } from "../vendor/three-addons/postprocessing/Pass.js";
 import { UnrealBloomPass } from "../vendor/three-addons/postprocessing/UnrealBloomPass.js";
-import { OutputPass } from "../vendor/three-addons/postprocessing/OutputPass.js";
-import { HorizontalTiltShiftShader } from "../vendor/three-addons/shaders/HorizontalTiltShiftShader.js";
-import { VerticalTiltShiftShader } from "../vendor/three-addons/shaders/VerticalTiltShiftShader.js";
 
-// Painterly grade: a little extra saturation, warm highlights, cool lilac shadows, soft vignette.
-const GradeShader = {
-  name: "GradeShader",
+// The whole finish in one full-screen pass: a tilt-shift blur that grows away from the focus line,
+// the painterly grade (a little extra saturation, warm highlights, cool lilac shadows, a soft
+// vignette, faint paper grain), then tone mapping and the display transfer.
+const FinishShader = {
   uniforms: {
     tDiffuse: { value: null },
+    toneMappingExposure: { value: 1 },
+    uTexel: { value: new THREE.Vector2(1, 1) },
+    uBlur: { value: 1.6 },
+    uFocus: { value: 0.45 },
     uSaturation: { value: 1.12 },
     uVignette: { value: 0.9 },
     uTime: { value: 0 }
   },
-  vertexShader: `
+  vertexShader: /* glsl */`
+    precision highp float;
+    attribute vec3 position;
+    attribute vec2 uv;
     varying vec2 vUv;
     void main() {
       vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      gl_Position = vec4(position.xy, 0.0, 1.0);
     }
   `,
-  fragmentShader: `
+  fragmentShader: /* glsl */`
+    precision highp float;
     uniform sampler2D tDiffuse;
+    uniform vec2 uTexel;
+    uniform float uBlur;
+    uniform float uFocus;
     uniform float uSaturation;
     uniform float uVignette;
     uniform float uTime;
+    #include <tonemapping_pars_fragment>
+    #include <colorspace_pars_fragment>
     varying vec2 vUv;
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    #ifdef TILT_SHIFT
+      vec3 ring(float radius, float count, float turn, float weight, vec2 scale) {
+        vec3 sum = vec3(0.0);
+        for (float i = 0.0; i < 6.0; i += 1.0) {
+          if (i >= count) break;
+          float a = turn + i * 6.2831853 / count;
+          sum += texture2D(tDiffuse, vUv + vec2(cos(a), sin(a)) * radius * scale).rgb;
+        }
+        return sum * weight;
+      }
+    #endif
     void main() {
       vec3 c = texture2D(tDiffuse, vUv).rgb;
+      #ifdef TILT_SHIFT
+        vec2 scale = uTexel * uBlur * abs(uFocus - vUv.y);
+        c = c * 0.12 + ring(1.3, 5.0, 0.0, 0.07, scale) + ring(2.9, 5.0, 0.63, 0.06, scale) + ring(4.6, 6.0, 0.26, 0.23 / 6.0, scale);
+      #endif
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       c = mix(vec3(l), c, uSaturation);
       float t = smoothstep(0.0, 0.9, l);
-      c *= mix(vec3(0.88, 0.9, 1.1), vec3(1.06, 1.0, 0.9), t);
+      c *= mix(vec3(0.90, 0.91, 1.07), vec3(1.07, 1.0, 0.88), t);
       vec2 d = vUv - 0.5;
       c *= 1.0 - dot(d, d) * uVignette;
-      // Faint paper grain keeps large flat areas from looking digital.
-      c += (hash(vUv * 900.0 + uTime) - 0.5) * 0.012;
-      gl_FragColor = vec4(c, 1.0);
+      // Static low-frequency grain reads as paper; the old per-frame hash read as video noise.
+      c += (hash(vUv * 420.0) - 0.5) * 0.0055;
+      gl_FragColor = vec4(max(c, 0.0), 1.0);
+      gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
+      gl_FragColor = sRGBTransferOETF(gl_FragColor);
     }
   `
 };
 
-export function createPost(renderer, scene, camera) {
-  const size = renderer.getSize(new THREE.Vector2());
-  const composer = new EffectComposer(renderer);
-  const renderPass = new RenderPass(scene, camera);
-  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.5, 0.5, 0.95);
-  const tiltH = new ShaderPass(HorizontalTiltShiftShader);
-  const tiltV = new ShaderPass(VerticalTiltShiftShader);
-  const grade = new ShaderPass(GradeShader);
-  composer.addPass(renderPass);
-  composer.addPass(bloom);
-  composer.addPass(tiltH);
-  composer.addPass(tiltV);
-  composer.addPass(grade);
-  composer.addPass(new OutputPass());
+// The scene is drawn once into a multisampled HDR target (so edges are antialiased even though the
+// picture goes through post-processing), bloom is added on top of it, and one finishing pass puts
+// the result on screen.
+export function createPost(renderer, scene) {
+  const gl = renderer.getContext();
+  const hdr = renderer.capabilities.isWebGL2 && (renderer.extensions.has("EXT_color_buffer_float") || renderer.extensions.has("EXT_color_buffer_half_float"));
+  const maxSamples = renderer.capabilities.isWebGL2 ? Math.min(4, gl.getParameter(gl.MAX_SAMPLES)) : 0;
+  let samples = maxSamples;
+  let width = 1;
+  let height = 1;
 
-  let blur = 2.2;
+  function makeTarget() {
+    return new THREE.WebGLRenderTarget(width, height, { type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType, samples });
+  }
+  let target = makeTarget();
+
+  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.42, 0.55, 0.97);
+  let bloomOn = hdr;
+  const finish = new THREE.RawShaderMaterial({
+    uniforms: FinishShader.uniforms,
+    vertexShader: FinishShader.vertexShader,
+    fragmentShader: FinishShader.fragmentShader,
+    defines: { TILT_SHIFT: "" },
+    depthTest: false,
+    depthWrite: false
+  });
+  const quad = new FullScreenQuad(finish);
+  const u = finish.uniforms;
   let focusY = 0.45;
 
-  function setSize(w, h, pixelRatio) {
-    composer.setPixelRatio(pixelRatio);
-    composer.setSize(w, h);
-    tiltH.uniforms.h.value = blur / (w * pixelRatio);
-    tiltV.uniforms.v.value = blur / (h * pixelRatio);
-  }
-
   return {
-    composer,
-    setSize,
+    get size() {
+      return { width, height };
+    },
+    setSize(w, h, pixelRatio) {
+      width = Math.max(1, Math.round(w * pixelRatio));
+      height = Math.max(1, Math.round(h * pixelRatio));
+      target.setSize(width, height);
+      bloom.setSize(width, height);
+      u.uTexel.value.set(1 / width, 1 / height);
+    },
+    // Fewer samples on the lowest tier; the target is rebuilt because the count is fixed at creation.
+    setSamples(count) {
+      const next = Math.min(count, maxSamples);
+      if (next === samples) return;
+      samples = next;
+      target.dispose();
+      target = makeTarget();
+    },
     setTiltShift(enabled) {
-      tiltH.enabled = enabled;
-      tiltV.enabled = enabled;
+      if (("TILT_SHIFT" in finish.defines) === enabled) return;
+      if (enabled) finish.defines.TILT_SHIFT = "";
+      else delete finish.defines.TILT_SHIFT;
+      finish.needsUpdate = true;
     },
     setBloom(enabled) {
-      bloom.enabled = enabled;
+      bloomOn = enabled && hdr;
     },
     // `y` is the screen height (0 bottom, 1 top) that stays sharp.
     setFocus(y, immediate = false) {
       focusY = immediate ? y : focusY + (y - focusY) * 0.15;
-      tiltH.uniforms.r.value = focusY;
-      tiltV.uniforms.r.value = focusY;
+      u.uFocus.value = focusY;
     },
     render(cam, time) {
-      renderPass.camera = cam;
-      grade.uniforms.uTime.value = time % 10;
-      composer.render();
+      renderer.setRenderTarget(target);
+      renderer.render(scene, cam);
+      if (bloomOn) bloom.render(renderer, null, target, 0, false);
+      renderer.setRenderTarget(null);
+      u.tDiffuse.value = target.texture;
+      u.toneMappingExposure.value = renderer.toneMappingExposure;
+      u.uTime.value = time % 10;
+      quad.render(renderer);
     }
   };
 }
@@ -129,8 +182,10 @@ export function softTexture() {
 export function blobTexture() {
   return canvasTexture(64, 64, (ctx, w) => {
     const g = ctx.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
-    g.addColorStop(0, "rgba(0,0,0,0.75)");
-    g.addColorStop(0.55, "rgba(0,0,0,0.35)");
+    // Two soft stages instead of one hard fade: a darker core that reads as ground contact,
+    // then a wide faint skirt so the edge never shows as a circle.
+    g.addColorStop(0, "rgba(0,0,0,0.70)");
+    g.addColorStop(0.45, "rgba(0,0,0,0.22)");
     g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, w);
