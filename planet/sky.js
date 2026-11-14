@@ -76,7 +76,7 @@ const MOODS = {
     top: hex("#3a6cbf"), mid: hex("#7fb0e6"), horizon: hex("#ffe2b8"), bottom: hex("#f3e3d6"),
     cloudLit: hex("#fffaf0"), cloudShade: hex("#b4bbe0"), glow: hex("#ffe1a8"), sun: hex("#fff3d6"),
     cover: 0.58, glowAmount: 0.55, sunAmount: 1.0, sunPower: 2.4,
-    light: hex("#ffe0b5"), lightPower: 2.35, skyLight: hex("#d6e6ff"), groundLight: hex("#8aa466"), ambient: 1.15
+    light: hex("#ffe0b5"), lightPower: 2.35, skyLight: hex("#e4e6cd"), groundLight: hex("#8aa466"), ambient: 1.15
   },
   dusk: {
     top: hex("#7a6fc0"), mid: hex("#f7a98c"), horizon: hex("#ff9a5c"), bottom: hex("#ffc39b"),
@@ -131,10 +131,9 @@ export function buildSky(renderer) {
       void main() {
         vec3 d = normalize(vDir);
         float h = d.y;
-        // Main cameras look down on the planet, so the frame only shows directions a bit below
-        // the true horizon. Shift the gradient down into that visible band (hz = h + 0.26) instead
-        // of reserving the interesting colours for sky the cameras never see.
-        float hz = h + 0.26;
+        // Shift the gradient far enough down that the thin band of sky the cameras see shows
+        // horizon warmth near the limb and real blue above it, instead of the pale bottom haze.
+        float hz = h + 0.42;
         vec3 col = mix(uHorizon, uMid, smoothstep(-0.06, 0.20, hz));
         col = mix(col, uTop, smoothstep(0.20, 0.58, hz));
         col = mix(col, uBottom, 1.0 - smoothstep(-0.30, -0.06, hz));

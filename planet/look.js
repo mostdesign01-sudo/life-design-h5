@@ -59,7 +59,7 @@ const FinishShader = {
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       c = mix(vec3(l), c, uSaturation);
       float t = smoothstep(0.0, 0.9, l);
-      c *= mix(vec3(0.88, 0.9, 1.1), vec3(1.06, 1.0, 0.9), t);
+      c *= mix(vec3(0.90, 0.91, 1.07), vec3(1.07, 1.0, 0.88), t);
       vec2 d = vUv - 0.5;
       c *= 1.0 - dot(d, d) * uVignette;
       // Static low-frequency grain reads as paper; the old per-frame hash read as video noise.

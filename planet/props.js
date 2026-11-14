@@ -7,10 +7,10 @@ import {
 import { softTexture, blobTexture, woodTexture, shingleTexture, stoneTexture } from "./look.js";
 
 export const mat = (color, extra = {}) =>
-  new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, envMapIntensity: 0.45, ...extra });
+  new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, envMapIntensity: 0.25, ...extra });
 
 export const textured = (map, extra = {}) =>
-  new THREE.MeshStandardMaterial({ map, roughness: 0.9, metalness: 0, ...extra });
+  new THREE.MeshStandardMaterial({ map, roughness: 0.9, metalness: 0, envMapIntensity: 0.3, ...extra });
 
 export function shadow(obj) {
   obj.traverse(node => {
@@ -63,7 +63,7 @@ export function addHalo(parent, position, size, color = 0xffc66b) {
 
 const FOLIAGE_DARK = new THREE.Color("#2e5a45");
 const FOLIAGE_LIGHT = new THREE.Color("#b5d65a");
-const foliageMat = seeThrough(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+const foliageMat = seeThrough(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.3 }));
 
 function foliageShadow(group) {
   group.traverse(node => {

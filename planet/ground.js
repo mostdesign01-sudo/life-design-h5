@@ -68,7 +68,7 @@ export function buildPlanet(aprons) {
   }
   geometry.computeVertexNormals();
 
-  const material = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, color: 0xffffff });
+  const material = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, color: 0xffffff, envMapIntensity: 0.22 });
   const uAprons = { value: aprons };
   patchMaterial(material, "ground", shader => {
     shader.uniforms.uHealth = shared.uHealth;
@@ -185,6 +185,7 @@ function grassMaterial() {
   const material = new THREE.MeshStandardMaterial({
     roughness: 0.92,
     metalness: 0,
+    envMapIntensity: 0.18,
     side: THREE.DoubleSide,
     vertexColors: false
   });
