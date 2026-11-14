@@ -44,8 +44,13 @@ const GROUND_GLSL = /* glsl */`
     col = mix(col, dirt, path);
 
     for (int i = 0; i < 6; i++) {
-      float apron = 1.0 - smoothstep(aprons[i].w * 0.55, aprons[i].w, chordTo(d, aprons[i].xyz));
-      col = mix(col, dirt * 0.92, apron * 0.85);
+      float dist = chordTo(d, aprons[i].xyz);
+      // Darken toward the prop instead of lightening: a bright disc under every object is what
+      // makes them read as stickers. Dirt patch inside, a soft AO skirt slightly wider.
+      float dirtK = 1.0 - smoothstep(aprons[i].w * 0.4, aprons[i].w, dist);
+      float rough = 0.85 + 0.3 * (vnoise(d * 90.0) - 0.5);
+      col = mix(col, vec3(0.60, 0.51, 0.37) * rough, dirtK * 0.55);
+      col *= 1.0 - 0.20 * (1.0 - smoothstep(0.0, aprons[i].w * 1.15, dist));
     }
     return col;
   }

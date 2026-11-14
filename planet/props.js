@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "../vendor/three-addons/geometries/RoundedBoxGeometry.js";
 import {
-  shared, seeThrough, patchMaterial, mergeStatic, mergeGeometries,
+  R, shared, seeThrough, patchMaterial, mergeStatic, mergeGeometries,
   taperedTube, lumpGeometry
 } from "./geo.js";
 import { softTexture, blobTexture, woodTexture, shingleTexture, stoneTexture } from "./look.js";
@@ -26,15 +26,25 @@ const BLOB = blobTexture();
 const SOFT = softTexture();
 
 export function addBlob(group, radius, opacity = 0.45) {
+  // Hug the sphere: on a planet of radius R a flat tangent disk floats r²/2R above the ground at
+  // its edge, so droop the disk to follow the curvature before rotating it into place.
+  const geo = new THREE.CircleGeometry(radius, 40);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i += 1) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    pos.setZ(i, 0.014 - (x * x + y * y) / (2 * R));
+  }
+  geo.rotateX(-Math.PI / 2);
+  geo.computeVertexNormals();
   const blob = new THREE.Mesh(
-    new THREE.PlaneGeometry(radius * 2, radius * 2),
+    geo,
     new THREE.MeshBasicMaterial({
       map: BLOB, transparent: true, opacity, depthWrite: false, color: 0x1d2440,
       polygonOffset: true, polygonOffsetFactor: -2
     })
   );
-  blob.rotation.x = -Math.PI / 2;
-  blob.position.y = 0.025;
+  blob.position.y = 0.004;
   blob.userData.noShadow = true;
   blob.renderOrder = 1;
   group.add(blob);

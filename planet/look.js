@@ -181,8 +181,10 @@ export function softTexture() {
 export function blobTexture() {
   return canvasTexture(64, 64, (ctx, w) => {
     const g = ctx.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
-    g.addColorStop(0, "rgba(0,0,0,0.75)");
-    g.addColorStop(0.55, "rgba(0,0,0,0.35)");
+    // Two soft stages instead of one hard fade: a darker core that reads as ground contact,
+    // then a wide faint skirt so the edge never shows as a circle.
+    g.addColorStop(0, "rgba(0,0,0,0.70)");
+    g.addColorStop(0.45, "rgba(0,0,0,0.22)");
     g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, w);

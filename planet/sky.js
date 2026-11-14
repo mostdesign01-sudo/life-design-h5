@@ -128,9 +128,13 @@ export function buildSky(renderer) {
       void main() {
         vec3 d = normalize(vDir);
         float h = d.y;
-        vec3 col = mix(uHorizon, uMid, smoothstep(-0.02, 0.2, h));
-        col = mix(col, uTop, smoothstep(0.2, 0.8, h));
-        col = mix(col, uBottom, smoothstep(0.0, -0.25, h));
+        // Main cameras look down on the planet, so the frame only shows directions a bit below
+        // the true horizon. Shift the gradient down into that visible band (hz = h + 0.26) instead
+        // of reserving the interesting colours for sky the cameras never see.
+        float hz = h + 0.26;
+        vec3 col = mix(uHorizon, uMid, smoothstep(-0.06, 0.20, hz));
+        col = mix(col, uTop, smoothstep(0.20, 0.58, hz));
+        col = mix(col, uBottom, 1.0 - smoothstep(-0.30, -0.06, hz));
         float s = max(dot(d, uSunDir), 0.0);
         // Warm air around the sun. Blended toward a colour rather than added, so facing the sun
         // gives a deeper sky instead of a white one.

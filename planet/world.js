@@ -36,6 +36,21 @@ export function createWorld(canvas) {
   const { sky, setMood } = buildSky(renderer);
   scene.add(sky);
 
+  // Image-based lighting: bake the sky into a PMREM env map so every standard material
+  // (especially the water) finally has something to reflect, and dark sides pick up skylight.
+  // The clone shares the sky's material, so mood changes propagate before each rebake.
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene();
+  envScene.add(sky.clone());
+  let envPlay = -1;
+  let envAt = -1e9;
+  function bakeEnv(play, time) {
+    if (scene.environment) scene.environment.dispose();
+    scene.environment = pmrem.fromScene(envScene, 0.05, 1, 400).texture;
+    envPlay = play;
+    envAt = time;
+  }
+
   const clouds = buildCloudSea(rand);
   scene.add(clouds.group);
 
@@ -372,6 +387,8 @@ export function createWorld(canvas) {
 
     const play = current.play;
     const mood = setMood(play, time);
+    // Rebake the env map only when the mood actually moved: a few times per session, not per frame.
+    if (envPlay < 0 || (Math.abs(play - envPlay) > 0.04 && time - envAt > 400)) bakeEnv(play, time);
     shared.uHaze.value.copy(mood.skyLight).lerp(fogTint, 0.35);
     shared.uSunTint.value.copy(mood.light);
     hemi.color.copy(mood.skyLight);
