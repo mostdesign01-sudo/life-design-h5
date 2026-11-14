@@ -154,11 +154,11 @@ export function createWorld(canvas) {
     bushes.push(bush);
   }
 
-  const grass = buildGrass(rand, blockers, { count: mobile ? 3800 : 6000, aprons });
+  const grass = buildGrass(rand, blockers, { count: mobile ? 4500 : 9500, aprons });
   grass.meshes.forEach(mesh => scene.add(mesh));
 
   const flowerMat = new THREE.MeshStandardMaterial({ roughness: 0.7, side: THREE.DoubleSide });
-  const flowers = scatter(rand, 420, blockers, flowerGeometry(), flowerMat, { avoidPath: true, tilt: 0.3 });
+  const flowers = scatter(rand, 680, blockers, flowerGeometry(), flowerMat, { avoidPath: true, tilt: 0.3 });
   const flowerPalette = [0xffffff, 0xfff1a8, 0xffb7cc, 0xd6c2ff, 0xffd27a].map(c => new THREE.Color(c));
   for (let i = 0; i < flowers.max; i += 1) flowers.mesh.setColorAt(i, flowerPalette[Math.floor(rand() * flowerPalette.length)]);
   scene.add(flowers.mesh);
@@ -221,6 +221,8 @@ export function createWorld(canvas) {
   const smokePos = new THREE.Vector3();
   const smokeQuat = new THREE.Quaternion();
   const smokeScale = new THREE.Vector3();
+  const smokeEuler = new THREE.Euler();
+  const spinQuat = new THREE.Quaternion();
 
   function setTargets(next) {
     Object.assign(target, next);
@@ -285,7 +287,16 @@ export function createWorld(canvas) {
       smoke.lives[slot] = 2.2 + Math.random() * 1.6;
       smoke.drifts[slot * 2] = (Math.random() - 0.5) * 0.25;
       smoke.drifts[slot * 2 + 1] = (Math.random() - 0.5) * 0.25;
+      smoke.spins[slot] = (Math.random() - 0.5) * 1.2;
+      smoke.sizes[slot] = 0.72 + Math.random() * 0.55;
       smokePos.copy(v.emit);
+      // A little scatter at the mouth of the chimney so puffs never line up into a chain.
+      smokePos.x += (Math.random() - 0.5) * 0.12;
+      smokePos.y += Math.random() * 0.1;
+      smokePos.z += (Math.random() - 0.5) * 0.12;
+      smokeQuat.setFromEuler(smokeEuler.set(
+        (Math.random() - 0.5) * 0.5, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.5
+      ));
       smokeScale.setScalar(0.7);
       smokeMat4.compose(smokePos, smokeQuat, smokeScale);
       smoke.mesh.setMatrixAt(slot, smokeMat4);
@@ -308,13 +319,18 @@ export function createWorld(canvas) {
       smokePos.y += dt * (0.35 + (1 - w) * 0.25);
       smokePos.x += smoke.drifts[i * 2] * dt;
       smokePos.z += smoke.drifts[i * 2 + 1] * dt;
-      const size = 0.7 + k * (1.6 + (1 - w) * 1.8);
+      const size = smoke.sizes[i] * (0.75 + (1.7 + (1 - w) * 1.9) * Math.pow(k, 0.55));
       smokeScale.set(size, size, size);
+      // Every puff slowly turns on its own axis so facets never line up across instances.
+      spinQuat.setFromAxisAngle(Y, smoke.spins[i] * dt);
+      smokeQuat.multiply(spinQuat);
       smokeMat4.compose(smokePos, smokeQuat, smokeScale);
       smoke.mesh.setMatrixAt(i, smokeMat4);
       const shade = THREE.MathUtils.smoothstep(1 - w, 0.25, 0.8);
       smoke.mesh.material.color.copy(smokeLight).lerp(smokeDark, shade);
-      alphas.setX(i, Math.min(1, Math.sin(k * Math.PI) * 1.5) * (0.55 + (1 - w) * 0.4));
+      // Ease in, hold, ease out — no mid-life brightness spike like the old sine curve.
+      alphas.setX(i, THREE.MathUtils.smoothstep(k, 0, 0.12)
+        * (1 - THREE.MathUtils.smoothstep(k, 0.55, 1)) * (0.42 + (1 - w) * 0.3));
     }
     smoke.mesh.instanceMatrix.needsUpdate = true;
     alphas.needsUpdate = true;

@@ -93,6 +93,9 @@ export function buildSky(renderer) {
     uHorizon: { value: MOODS.day.horizon.clone() },
     uBottom: { value: MOODS.day.bottom.clone() },
     uSunDir: { value: SUN.clone() },
+    // The disc stays at the real sun elevation so the bench stop keeps its sunset; the intro
+    // camera looks down too steeply to fit a disc in frame, but the warm glow around the sun
+    // direction (uGlow) does reach into the intro's sky band from the flipped yaw.
     uSunColor: { value: MOODS.day.sun.clone() },
     uSunPower: { value: 3 },
     uSunAmount: { value: 1 },

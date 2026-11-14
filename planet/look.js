@@ -10,7 +10,7 @@ const FinishShader = {
     tDiffuse: { value: null },
     toneMappingExposure: { value: 1 },
     uTexel: { value: new THREE.Vector2(1, 1) },
-    uBlur: { value: 2.2 },
+    uBlur: { value: 1.6 },
     uFocus: { value: 0.45 },
     uSaturation: { value: 1.12 },
     uVignette: { value: 0.9 },
@@ -62,7 +62,8 @@ const FinishShader = {
       c *= mix(vec3(0.88, 0.9, 1.1), vec3(1.06, 1.0, 0.9), t);
       vec2 d = vUv - 0.5;
       c *= 1.0 - dot(d, d) * uVignette;
-      c += (hash(vUv * 900.0 + uTime) - 0.5) * 0.012;
+      // Static low-frequency grain reads as paper; the old per-frame hash read as video noise.
+      c += (hash(vUv * 420.0) - 0.5) * 0.0055;
       gl_FragColor = vec4(max(c, 0.0), 1.0);
       gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
       gl_FragColor = sRGBTransferOETF(gl_FragColor);

@@ -161,7 +161,9 @@ const cam = {
 };
 // Intro and overview: an isometric-style view of the whole planet.
 const orbit = {
-  yaw: Math.atan2(POLE.x, POLE.z) - 0.5,
+  // Face the sun side: the visual sun disc hangs just above the limb, and the intro looks
+  // toward it instead of away (the old yaw put the sun behind the camera, out of frame forever).
+  yaw: Math.atan2(SUN.x, SUN.z) + Math.PI,
   pitch: 0.5,
   scale: 1
 };

@@ -361,6 +361,9 @@ function smokeMaterial() {
       .replace("#include <common>", `#include <common>
         varying float vAlpha;`)
       .replace("#include <color_fragment>", `#include <color_fragment>
+        // Fade out toward the silhouette so the low-poly puff outline never shows as a facet edge.
+        float facing = abs(dot(normalize(vNormal), normalize(vViewPosition)));
+        diffuseColor.a *= smoothstep(0.12, 0.78, facing);
         diffuseColor.a *= vAlpha;`);
   });
   return material;
@@ -497,7 +500,9 @@ export function buildWorkshop() {
       max,
       ages: new Float32Array(max),
       lives: new Float32Array(max),
-      drifts: new Float32Array(max * 2)
+      drifts: new Float32Array(max * 2),
+      spins: new Float32Array(max),
+      sizes: new Float32Array(max)
     },
     emit: new THREE.Vector3(-0.28, 1.3, -0.12),
     spawn: 0

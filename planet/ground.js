@@ -34,8 +34,9 @@ const GROUND_GLSL = /* glsl */`
     float n = fieldDetail(d);
     vec3 col = mix(strawOf(p), meadowOf(p), smoothstep(0.05, 0.6, health));
     col += (n - 0.5) * 0.06;
-    float mottling = vnoise(d * 18.0) * 0.04;
-    col *= 1.0 + mottling;
+    // Two frequencies: a slow field patch for colour variation, a faint high grain so the
+    // ground never tiles, instead of one mid-frequency band that read as sandpaper.
+    col *= 1.0 + vnoise(d * 5.5) * 0.055 + (vnoise(d * 26.0) - 0.5) * 0.024;
 
     float off = abs(acos(clamp(dot(d, vec3(${POLE.x.toFixed(5)}, ${POLE.y.toFixed(5)}, ${POLE.z.toFixed(5)})), -1.0, 1.0)) - ${PATH_ANGLE.toFixed(5)});
     float edge = 0.026 + (vnoise(d * 40.0) - 0.5) * 0.010;
@@ -139,7 +140,7 @@ export function buildAtmosphere() {
 const TUFT_H = 0.2;
 
 function tuftGeometry() {
-  const blades = 5;
+  const blades = 7;
   const segs = 2;
   const positions = [];
   const normals = [];
