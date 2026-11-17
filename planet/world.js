@@ -154,13 +154,30 @@ export function createWorld(canvas) {
     bushes.push(bush);
   }
 
-  const grass = buildGrass(rand, blockers, { count: mobile ? 4500 : 9500, aprons });
+  const grass = buildGrass(rand, blockers, { count: mobile ? 5200 : 11000, aprons });
   grass.meshes.forEach(mesh => scene.add(mesh));
 
   const flowerMat = new THREE.MeshStandardMaterial({ roughness: 0.7, side: THREE.DoubleSide });
-  const flowers = scatter(rand, 680, blockers, flowerGeometry(), flowerMat, { avoidPath: true, tilt: 0.3 });
+  // Flowers grow in drifts, each mostly one colour: scattered singly in five colours they read
+  // as confetti on the lawn.
   const flowerPalette = [0xffffff, 0xfff1a8, 0xffb7cc, 0xd6c2ff, 0xffd27a].map(c => new THREE.Color(c));
-  for (let i = 0; i < flowers.max; i += 1) flowers.mesh.setColorAt(i, flowerPalette[Math.floor(rand() * flowerPalette.length)]);
+  const drifts = Array.from({ length: 30 }, (_, i) => {
+    let dir = randomDir(rand);
+    if (dir.dot(POLE) < 0 && rand() < 0.75) dir.multiplyScalar(-1);
+    return { dir, spread: 0.05 + rand() * 0.07, colour: i % flowerPalette.length };
+  });
+  const flowers = scatter(rand, 540, blockers, flowerGeometry(), flowerMat, {
+    avoidPath: true, tilt: 0.3, scaleMin: 0.75, scaleMax: 1.15,
+    near: r => {
+      const drift = drifts[Math.floor(r() * drifts.length)];
+      return randomDir(r).multiplyScalar(drift.spread * (0.4 + r())).add(drift.dir).normalize();
+    }
+  });
+  flowers.dirs.forEach((dir, i) => {
+    let best = drifts[0];
+    drifts.forEach(drift => { if (drift.dir.dot(dir) > best.dir.dot(dir)) best = drift; });
+    flowers.mesh.setColorAt(i, flowerPalette[rand() < 0.85 ? best.colour : Math.floor(rand() * flowerPalette.length)]);
+  });
   scene.add(flowers.mesh);
 
   const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
@@ -199,7 +216,7 @@ export function createWorld(canvas) {
     objects[id] = { id, ...item, hit, reach: item.radius + 0.1 };
   });
 
-  const post = createPost(renderer, scene);
+  const post = createPost(renderer, scene, shared.uHole);
   let tiltShift = true;
   let qualityLevel = 2;
 
@@ -414,7 +431,7 @@ export function createWorld(canvas) {
     sun.intensity = mood.lightPower;
     scene.fog.color.copy(shared.uHaze.value);
     clouds.materials.forEach(m => m.color.copy(cloudDull).lerp(cloudVivid, mood.vivid));
-    atmosphere.material.uniforms.uStrength.value = 0.28 + mood.vivid * 0.18;
+    atmosphere.material.uniforms.uStrength.value = 0.16 + mood.vivid * 0.12;
 
     const knotScale = current.problem < 0.5 ? 0.45 : 0.4 + current.gravity * 1.2;
     vine.knot.scale.setScalar(knotScale);

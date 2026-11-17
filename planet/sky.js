@@ -73,18 +73,18 @@ const MOODS = {
     light: hex("#e9edf5"), lightPower: 1.15, skyLight: hex("#dfe6f2"), groundLight: hex("#8e9a84"), ambient: 1.25
   },
   day: {
-    top: hex("#3a6cbf"), mid: hex("#7fb0e6"), horizon: hex("#ffe2b8"), bottom: hex("#f3e3d6"),
+    top: hex("#3a6cbf"), mid: hex("#72a8ea"), horizon: hex("#ffd9a6"), bottom: hex("#f5d6bb"),
     cloudLit: hex("#fffaf0"), cloudShade: hex("#b4bbe0"), glow: hex("#ffe1a8"), sun: hex("#fff3d6"),
     cover: 0.58, glowAmount: 0.55, sunAmount: 1.0, sunPower: 2.4,
     // The shadow side is lit by this ambient alone, so its colour is the colour of every shadow:
     // a soft violet-blue against the warm sun, as in a painted storybook.
-    light: hex("#ffdca8"), lightPower: 2.2, skyLight: hex("#c2c0f2"), groundLight: hex("#7f8fb0"), ambient: 1.0
+    light: hex("#ffdca8"), lightPower: 2.2, skyLight: hex("#b9b6f0"), groundLight: hex("#7888b0"), ambient: 0.92
   },
   dusk: {
     top: hex("#7a6fc0"), mid: hex("#f7a98c"), horizon: hex("#ff9a5c"), bottom: hex("#ffc39b"),
     cloudLit: hex("#ffb07a"), cloudShade: hex("#8a5f9e"), glow: hex("#ff8438"), sun: hex("#ffb060"),
     cover: 0.55, glowAmount: 0.85, sunAmount: 1.0, sunPower: 2.8,
-    light: hex("#ffb878"), lightPower: 2.45, skyLight: hex("#d9b4e6"), groundLight: hex("#8a6f9a"), ambient: 0.95
+    light: hex("#ffb878"), lightPower: 2.45, skyLight: hex("#d2a8e4"), groundLight: hex("#866c9a"), ambient: 0.88
   }
 };
 

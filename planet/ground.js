@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import {
   R, Y, POLE, PATH_ANGLE, SUN, shared, NOISE_GLSL, patchMaterial, seeThrough,
-  surfaceRadius, randomDir
+  surfaceRadius, randomDir, yawToward
 } from "./geo.js";
 
 const GROUND_GLSL = /* glsl */`
@@ -34,10 +34,10 @@ const GROUND_GLSL = /* glsl */`
     float p = fieldPatch(d);
     float n = fieldDetail(d);
     vec3 col = mix(strawOf(p), meadowOf(p), smoothstep(0.05, 0.6, health));
-    col += (n - 0.5) * 0.06;
+    col += (n - 0.5) * 0.035;
     // Two frequencies: a slow field patch for colour variation, a faint high grain so the
     // ground never tiles, instead of one mid-frequency band that read as sandpaper.
-    col *= 1.0 + vnoise(d * 5.5) * 0.055 + (vnoise(d * 26.0) - 0.5) * 0.024;
+    col *= 1.0 + vnoise(d * 5.5) * 0.05 + (vnoise(d * 26.0) - 0.5) * 0.008;
 
     float off = abs(acos(clamp(dot(d, vec3(${POLE.x.toFixed(5)}, ${POLE.y.toFixed(5)}, ${POLE.z.toFixed(5)})), -1.0, 1.0)) - ${PATH_ANGLE.toFixed(5)});
     float edge = 0.026 + (vnoise(d * 40.0) - 0.5) * 0.010;
@@ -86,7 +86,7 @@ export function buildPlanet(aprons) {
         diffuseColor.rgb *= g;`)
       .replace("#include <opaque_fragment>", `#include <opaque_fragment>
         float haze = smoothstep(0.35, 0.98, 1.0 - max(dot(normalize(vPlanetDir), vec3(0.0, 1.0, 0.0)) * 0.5 + 0.5, 0.0));
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, uHaze, haze * 0.12);`);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, uHaze, haze * 0.05);`);
   });
 
   const mesh = new THREE.Mesh(geometry, material);
@@ -139,38 +139,47 @@ export function buildAtmosphere() {
   return { mesh, material };
 }
 
-const TUFT_H = 0.2;
+const TUFT_H = 0.15;
+// The breeze blows one way across the whole planet; every blade leans with it.
+const WIND = new THREE.Vector3(0.82, 0.1, -0.56).normalize();
 
+// A patch of lawn rather than a weed: broad soft blades scattered over a small disc, all leaning
+// downwind (local +Z) and close to one height, so neighbouring patches knit into a single carpet.
 function tuftGeometry() {
-  const blades = 7;
+  const blades = 10;
   const segs = 2;
   const positions = [];
   const normals = [];
   const uvs = [];
+  const rand = (() => { let s = 7; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; })();
   for (let b = 0; b < blades; b += 1) {
-    const a = (b / blades) * Math.PI * 2 + 0.2;
-    const lean = 0.04 + (b % 2) * 0.02;
-    const h = TUFT_H * (0.75 + (b % 3) * 0.12);
-    const w = 0.018;
+    const ba = (b / blades) * Math.PI * 2 + rand() * 0.6;
+    const br = 0.035 + 0.075 * Math.sqrt(rand());
+    const bx = Math.cos(ba) * br;
+    const bz = Math.sin(ba) * br;
+    const face = rand() * Math.PI;
+    const lean = 0.035 + rand() * 0.02;
+    const h = TUFT_H * (0.82 + rand() * 0.18);
+    const w = 0.03;
+    const width = t => w * (1 - t * t * 0.8);
     for (let s = 0; s < segs; s += 1) {
       const t0 = s / segs;
       const t1 = (s + 1) / segs;
       const y0 = t0 * h;
       const y1 = t1 * h;
-      const x0 = Math.cos(a) * lean * t0 * t0;
-      const z0 = Math.sin(a) * lean * t0 * t0;
-      const x1 = Math.cos(a) * lean * t1 * t1;
-      const z1 = Math.sin(a) * lean * t1 * t1;
-      const wx0 = Math.cos(a + Math.PI / 2) * w * (1 - t0 * 0.85);
-      const wz0 = Math.sin(a + Math.PI / 2) * w * (1 - t0 * 0.85);
-      const wx1 = Math.cos(a + Math.PI / 2) * w * (1 - t1 * 0.85);
-      const wz1 = Math.sin(a + Math.PI / 2) * w * (1 - t1 * 0.85);
+      const z0 = bz + lean * t0 * t0;
+      const z1 = bz + lean * t1 * t1;
+      const wx0 = Math.cos(face) * width(t0);
+      const wz0 = Math.sin(face) * width(t0);
+      const wx1 = Math.cos(face) * width(t1);
+      const wz1 = Math.sin(face) * width(t1);
       const verts = [
-        [x0 - wx0, y0, z0 - wz0], [x0 + wx0, y0, z0 + wz0], [x1 + wx1, y1, z1 + wz1],
-        [x0 - wx0, y0, z0 - wz0], [x1 + wx1, y1, z1 + wz1], [x1 - wx1, y1, z1 - wz1]
+        [bx - wx0, y0, z0 - wz0], [bx + wx0, y0, z0 + wz0], [bx + wx1, y1, z1 + wz1],
+        [bx - wx0, y0, z0 - wz0], [bx + wx1, y1, z1 + wz1], [bx - wx1, y1, z1 - wz1]
       ];
       verts.forEach(v => {
         positions.push(...v);
+        // Lit as the ground it grows from, so the lawn shades as one surface, not blade by blade.
         normals.push(0, 1, 0);
         uvs.push(v[1] / h, v[1] / h);
       });
@@ -199,7 +208,7 @@ function grassMaterial() {
     shader.uniforms.uAprons = { value: shared._aprons || [] };
     // Bind the same apron array the planet uses (filled by createWorld).
     shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", `#include <common>\nuniform float uTime;\nvarying float vH;\nvarying vec3 vPlanetDir;`)
+      .replace("#include <common>", `#include <common>\nuniform float uTime;\nvarying float vH;\nvarying float vWave;\nvarying vec3 vPlanetDir;`)
       .replace("#include <begin_vertex>", `#include <begin_vertex>
         vH = clamp(position.y / ${TUFT_H.toFixed(3)}, 0.0, 1.0);
         vec3 ip = vec3(0.0);
@@ -207,14 +216,28 @@ function grassMaterial() {
           ip = instanceMatrix[3].xyz;
         #endif
         vPlanetDir = normalize(ip);
-        float gust = sin(uTime * 1.6 + ip.x * 0.9 + ip.z * 0.7) + 0.5 * sin(uTime * 2.7 + ip.y * 1.9);
-        transformed.x += gust * 0.045 * vH * vH;
-        transformed.z += gust * 0.028 * vH * vH;`);
+        // Broad bands of wind roll downwind across the meadow; a slower cross swell keeps the
+        // fronts from reading as ruled lines.
+        vec3 windDir = vec3(${WIND.x.toFixed(4)}, ${WIND.y.toFixed(4)}, ${WIND.z.toFixed(4)});
+        float along = dot(ip, windDir);
+        float cross = dot(ip, vec3(0.31, 0.62, 0.72));
+        float wave = 0.5 + 0.5 * sin(along * 1.25 - uTime * 1.5 + 1.1 * sin(cross * 0.8 + uTime * 0.25));
+        wave = wave * wave * (3.0 - 2.0 * wave);
+        vWave = wave;
+        transformed.z += (0.012 + 0.06 * wave) * vH * vH;
+        transformed.y -= 0.022 * wave * vH * vH;`);
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\nuniform float uHealth;\nuniform vec3 uHaze;\nuniform vec4 uAprons[6];\nvarying float vH;\nvarying vec3 vPlanetDir;\n${GROUND_GLSL}`)
+      .replace("#include <common>", `#include <common>\nuniform float uHealth;\nuniform vec3 uHaze;\nuniform vec4 uAprons[6];\nvarying float vH;\nvarying float vWave;\nvarying vec3 vPlanetDir;\n${GROUND_GLSL}`)
       .replace("#include <color_fragment>", `#include <color_fragment>
         vec3 g = groundColour(normalize(vPlanetDir), uHealth, uAprons);
-        diffuseColor.rgb = g * mix(0.72, 1.22, vH);`);
+        // Roots match the ground exactly, so there is no dark stubble between blades; tips warm
+        // toward a sunlit yellow-green, and the passing wind front lifts them a little further.
+        vec3 tip = g * vec3(1.17, 1.15, 0.92) + vec3(0.02, 0.04, 0.0);
+        diffuseColor.rgb = mix(g, tip, vH * (0.55 + 0.45 * vWave));`)
+      // Blades are two-sided, and the renderer flips the normal on a back face: half the lawn was
+      // being lit as if it faced the ground. Both sides take the ground's normal.
+      .replace("#include <normal_fragment_begin>", `#include <normal_fragment_begin>
+        normal = normalize(vNormal);`);
   });
   seeThrough(material);
   return material;
@@ -266,9 +289,9 @@ export function buildGrass(rand, blockers, { count, aprons }) {
       if (d.dot(center) < 0.55) continue;
       if (blockers.some(b => d.angleTo(b.dir) < b.radius + 0.04)) continue;
       if (Math.abs(d.angleTo(POLE) - PATH_ANGLE) < 0.05) continue;
-      const s = 0.75 + rand() * 0.7;
+      const s = 0.88 + rand() * 0.3;
       q.setFromUnitVectors(Y, d);
-      q2.setFromEuler(e.set((rand() - 0.5) * 0.35, rand() * Math.PI * 2, (rand() - 0.5) * 0.35));
+      q2.setFromEuler(e.set((rand() - 0.5) * 0.08, yawToward(d, WIND) + (rand() - 0.5) * 0.7, (rand() - 0.5) * 0.08));
       q.multiply(q2);
       m.compose(d.clone().multiplyScalar(surfaceRadius(d)), q, new THREE.Vector3(s, s, s));
       mesh.setMatrixAt(placed, m);

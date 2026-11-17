@@ -39,6 +39,14 @@ import * as THREE from "three";
 `;
 }
 
+// Terrain and grass write alpha 0 into the (opaque) frame: the finishing pass reads it as "do not
+// ink an outline around this" (see inkLine in look.js).
+THREE.ShaderChunk.opaque_fragment += `
+#ifdef TOON_GROUND
+	gl_FragColor.a = 0.0;
+#endif
+`;
+
 // The planet is small against what stands on it: a house is about a quarter of its radius, so the
 // horizon always curves and every stop reads at a glance.
 export const R = 4.4;

@@ -14,6 +14,12 @@ const FinishShader = {
     uFocus: { value: 0.45 },
     uSaturation: { value: 1.2 },
     uVignette: { value: 0.9 },
+    uContrast: { value: 1.14 },
+    tDepth: { value: null },
+    uOutline: { value: 0 },
+    uClip: { value: new THREE.Vector2(0.1, 600) },
+    uHole: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uInk: { value: new THREE.Color("#5b3c4c") },
     uTime: { value: 0 }
   },
   vertexShader: /* glsl */`
@@ -35,6 +41,12 @@ const FinishShader = {
     uniform float uSaturation;
     uniform float uVignette;
     uniform float uTime;
+    uniform float uContrast;
+    uniform sampler2D tDepth;
+    uniform float uOutline;
+    uniform vec2 uClip;
+    uniform vec4 uHole;
+    uniform vec3 uInk;
     #include <tonemapping_pars_fragment>
     #include <colorspace_pars_fragment>
     varying vec2 vUv;
@@ -50,12 +62,55 @@ const FinishShader = {
         return sum * weight;
       }
     #endif
+    float viewZ(vec2 uv) {
+      float d = texture2D(tDepth, uv).r;
+      return uClip.x * uClip.y / (uClip.y - d * (uClip.y - uClip.x));
+    }
+    // An inked silhouette from the depth buffer. The Laplacian is zero across any flat slope, and
+    // the terrain and grass mark themselves with alpha 0 (see geo.js), so a line is drawn only
+    // where the nearest thing at a depth step is a prop or the traveler: blades of grass, and the
+    // planet's own horizon, stay unlined.
+    float inkLine() {
+      vec2 o = uTexel * 1.15;
+      vec2 uvs[5];
+      uvs[0] = vUv;
+      uvs[1] = vUv - vec2(o.x, 0.0);
+      uvs[2] = vUv + vec2(o.x, 0.0);
+      uvs[3] = vUv - vec2(0.0, o.y);
+      uvs[4] = vUv + vec2(0.0, o.y);
+      float zc = viewZ(uvs[0]);
+      float near = zc;
+      float mask = texture2D(tDiffuse, uvs[0]).a;
+      float sum = -4.0 * zc;
+      for (int i = 1; i < 5; i++) {
+        float z = viewZ(uvs[i]);
+        sum += z;
+        if (z < near) {
+          near = z;
+          mask = texture2D(tDiffuse, uvs[i]).a;
+        }
+      }
+      float line = smoothstep(0.03, 0.10, abs(sum) / near) * smoothstep(0.35, 0.75, mask);
+      // Far trees keep a hairline, not a blot, and the sky dome (where depth precision runs out
+      // and the Laplacian is all noise) gets none; whatever is dithered away in front of the
+      // traveler is skipped too, since every other pixel there is a depth step.
+      line *= (1.0 - 0.7 * smoothstep(9.0, 30.0, near)) * (1.0 - smoothstep(45.0, 80.0, near));
+      if (uHole.z > 0.0 && near < uHole.w - 0.35) line *= smoothstep(0.9, 1.15, distance(gl_FragCoord.xy, uHole.xy) / uHole.z);
+      return line;
+    }
     void main() {
       vec3 c = texture2D(tDiffuse, vUv).rgb;
       #ifdef TILT_SHIFT
         vec2 scale = uTexel * uBlur * abs(uFocus - vUv.y);
         c = c * 0.12 + ring(1.3, 5.0, 0.0, 0.07, scale) + ring(2.9, 5.0, 0.63, 0.06, scale) + ring(4.6, 6.0, 0.26, 0.23 / 6.0, scale);
       #endif
+      if (uOutline > 0.0) c = mix(c, c * uInk, inkLine() * uOutline);
+      // Contrast around scene mid-grey: deepens the shadow side and clears the milky veil that
+      // ambient light, bloom and haze add up to.
+      // Below the pivot the curve is eased back toward the original, so the shadow side of the
+      // traveler and the props deepens without sinking to black.
+      vec3 curved = pow(max(c, 0.0) / 0.2, vec3(uContrast)) * 0.2;
+      c = mix(mix(c, curved, 0.45), curved, smoothstep(0.02, 0.2, max(c.r, max(c.g, c.b))));
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       c = mix(vec3(l), c, uSaturation);
       float t = smoothstep(0.0, 0.9, l);
@@ -74,7 +129,7 @@ const FinishShader = {
 // The scene is drawn once into a multisampled HDR target (so edges are antialiased even though the
 // picture goes through post-processing), bloom is added on top of it, and one finishing pass puts
 // the result on screen.
-export function createPost(renderer, scene) {
+export function createPost(renderer, scene, hole) {
   const gl = renderer.getContext();
   const hdr = renderer.capabilities.isWebGL2 && (renderer.extensions.has("EXT_color_buffer_float") || renderer.extensions.has("EXT_color_buffer_half_float"));
   const maxSamples = renderer.capabilities.isWebGL2 ? Math.min(4, gl.getParameter(gl.MAX_SAMPLES)) : 0;
@@ -83,11 +138,18 @@ export function createPost(renderer, scene) {
   let height = 1;
 
   function makeTarget() {
-    return new THREE.WebGLRenderTarget(width, height, { type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType, samples });
+    const depthTexture = renderer.capabilities.isWebGL2 ? new THREE.DepthTexture(width, height) : null;
+    return new THREE.WebGLRenderTarget(width, height, { type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType, samples, depthTexture });
   }
   let target = makeTarget();
 
-  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.42, 0.55, 0.97);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.28, 0.5, 0.98);
+  // Bloom is added to the colour only: the alpha channel carries the outline mask.
+  bloom.blendMaterial.blending = THREE.CustomBlending;
+  bloom.blendMaterial.blendSrc = THREE.SrcAlphaFactor;
+  bloom.blendMaterial.blendDst = THREE.OneFactor;
+  bloom.blendMaterial.blendSrcAlpha = THREE.ZeroFactor;
+  bloom.blendMaterial.blendDstAlpha = THREE.OneFactor;
   let bloomOn = hdr;
   const finish = new THREE.RawShaderMaterial({
     uniforms: FinishShader.uniforms,
@@ -100,6 +162,7 @@ export function createPost(renderer, scene) {
   const quad = new FullScreenQuad(finish);
   const u = finish.uniforms;
   let focusY = 0.45;
+  let outline = 0.7;
 
   return {
     get size() {
@@ -126,6 +189,9 @@ export function createPost(renderer, scene) {
       else delete finish.defines.TILT_SHIFT;
       finish.needsUpdate = true;
     },
+    setOutline(amount) {
+      outline = amount;
+    },
     setBloom(enabled) {
       bloomOn = enabled && hdr;
     },
@@ -140,6 +206,10 @@ export function createPost(renderer, scene) {
       if (bloomOn) bloom.render(renderer, null, target, 0, false);
       renderer.setRenderTarget(null);
       u.tDiffuse.value = target.texture;
+      u.tDepth.value = target.depthTexture;
+      u.uOutline.value = target.depthTexture ? outline : 0;
+      u.uClip.value.set(cam.near, cam.far);
+      if (hole) u.uHole.value.copy(hole.value);
       u.toneMappingExposure.value = renderer.toneMappingExposure;
       u.uTime.value = time % 10;
       quad.render(renderer);
