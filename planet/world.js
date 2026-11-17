@@ -26,7 +26,9 @@ export function createWorld(canvas) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.95;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.VSMShadowMap;
+  // Plain filtered shadows, not variance ones: the toon step in geo.js sharpens whatever the
+  // shadow lookup returns, and sharpening VSM's light bleeding turned every shadow into speckle.
+  renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xf0e2d4, 55, 140);
@@ -67,9 +69,9 @@ export function createWorld(canvas) {
   sc.right = sc.top = shadowExtent;
   sc.near = 8;
   sc.far = 48;
-  sun.shadow.bias = -0.0005;
-  sun.shadow.radius = 1.6;
-  sun.shadow.blurSamples = 12;
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.025;
+  sun.shadow.radius = mobile ? 1.4 : 2.2;
   scene.add(sun, sun.target);
   const fill = new THREE.DirectionalLight(0xc4d2ff, 0.28);
   fill.position.copy(SUN).multiplyScalar(-1).add(Y.clone().multiplyScalar(1.2)).multiplyScalar(18);
@@ -490,9 +492,6 @@ export function createWorld(canvas) {
     if (level < 2) pixelRatio = Math.min(pixelRatio, 1.25);
     if (level < 1) {
       pixelRatio = 1;
-      renderer.shadowMap.type = THREE.PCFShadowMap;
-      sun.shadow.map?.dispose();
-      sun.shadow.map = null;
     }
     grass.setCount(level >= 2 ? 1 : level >= 1 ? 0.7 : 0.45);
     setSize(window.innerWidth, window.innerHeight);

@@ -26,7 +26,7 @@ import * as THREE from "three";
 	#endif`);
   swap("lights_fragment_begin",
     "directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;",
-    "directLight.color *= ( directLight.visible && receiveShadow ) ? smoothstep( 0.38, 0.62, getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) ) : 1.0;");
+    "directLight.color *= ( directLight.visible && receiveShadow ) ? smoothstep( 0.3, 0.7, getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) ) : 1.0;");
   chunk.lights_fragment_end += `
 #if defined( STANDARD ) && NUM_DIR_LIGHTS > 0 && ! defined( TOON_GROUND )
 	float toonRim = 1.0 - saturate( dot( geometryNormal, geometryViewDir ) );

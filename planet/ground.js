@@ -225,15 +225,22 @@ function grassMaterial() {
         wave = wave * wave * (3.0 - 2.0 * wave);
         vWave = wave;
         transformed.z += (0.012 + 0.06 * wave) * vH * vH;
-        transformed.y -= 0.022 * wave * vH * vH;`);
+        transformed.y -= 0.022 * wave * vH * vH;`)
+      // A blade is shadowed where it stands, not where its tip happens to reach: sampled per
+      // vertex, a tree's shadow on the lawn broke up into a litter of lit tips and dark roots.
+      .replace("#include <shadowmap_vertex>", `
+        #if defined( USE_SHADOWMAP ) && defined( USE_INSTANCING )
+          worldPosition = modelMatrix * instanceMatrix * vec4(position.x, 0.01, position.z, 1.0);
+        #endif
+        #include <shadowmap_vertex>`);
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>\nuniform float uHealth;\nuniform vec3 uHaze;\nuniform vec4 uAprons[6];\nvarying float vH;\nvarying float vWave;\nvarying vec3 vPlanetDir;\n${GROUND_GLSL}`)
       .replace("#include <color_fragment>", `#include <color_fragment>
         vec3 g = groundColour(normalize(vPlanetDir), uHealth, uAprons);
         // Roots match the ground exactly, so there is no dark stubble between blades; tips warm
         // toward a sunlit yellow-green, and the passing wind front lifts them a little further.
-        vec3 tip = g * vec3(1.17, 1.15, 0.92) + vec3(0.02, 0.04, 0.0);
-        diffuseColor.rgb = mix(g, tip, vH * (0.55 + 0.45 * vWave));`)
+        vec3 tip = g * vec3(1.12, 1.11, 0.95) + vec3(0.012, 0.025, 0.0);
+        diffuseColor.rgb = mix(g, tip, vH * (0.4 + 0.6 * vWave));`)
       // Blades are two-sided, and the renderer flips the normal on a back face: half the lawn was
       // being lit as if it faced the ground. Both sides take the ground's normal.
       .replace("#include <normal_fragment_begin>", `#include <normal_fragment_begin>
