@@ -527,7 +527,7 @@ function supportFor(coach) {
 function coachHTML(coach) {
   if (!coach) return "";
   if (coach.status === "loading") {
-    return `<div class="coach"><span class="coach-label">AI 关键追问</span><p>AI 正在做一次短判断：一个关键观察、一个追问和一个低成本原型动作。</p></div>`;
+    return `<div class="coach"><span class="coach-label">AI 关键追问</span><p>星球在想一个值得问你的问题，稍等一下。</p></div>`;
   }
   // When the AI can't be reached, leave it out: the fixed feedback above stands on its own.
   if (coach.status === "error") return "";
@@ -669,29 +669,37 @@ function openDiary() {
     return;
   }
   openDiary.editing = false;
-  const low = sortedScores()[0];
+  const sorted = sortedScores();
+  const low = sorted[0];
+  const high = sorted[sorted.length - 1];
+  // When nothing is low there is no red light to name: ask what is worth keeping instead.
+  const bright = low.score >= 7;
   openSheet({
     focusId: "sign",
     actions: {
       submit() {
         const note = document.getElementById("noteInput").value.trim();
         if (note.length < 4) {
-          document.getElementById("noteWarn").textContent = "请写一句最亮红灯的观察。分数是仪表，原因才是设计材料。";
+          document.getElementById("noteWarn").textContent = "写一句就好，几个字也行。分数是仪表，原因才是设计材料。";
           return;
         }
+        const first = !life.completed.includes("dashboard");
         life.answers.dashboard.note = note;
         markCompleted(life, "dashboard");
         persist();
         celebrate("sign", 9);
-        showPostcard();
+        if (first) finale();
+        else showPostcard();
       }
     }
   }, `
     <div class="sheet-kicker">星球日记</div>
-    <h2 class="sheet-title" id="sheetTitle">走完一圈，最暗的地方是「${low.label}」。</h2>
-    <p class="sheet-story">这里没有好坏评判，只有一个设计事实：如果红灯项长期被忽略，其他项迟早会替它付账。</p>
-    <p class="sheet-question">写一句：哪一项已经亮红灯，为什么？</p>
-    <textarea id="noteInput" placeholder="比如：${low.label}只有 ${low.score} 分，因为……">${escapeHTML(life.answers.dashboard.note || "")}</textarea>
+    <h2 class="sheet-title" id="sheetTitle">${bright ? "走完一圈，每一处都还亮着。" : `走完一圈，最需要照看的是「${low.label}」。`}</h2>
+    <p class="sheet-story">${bright
+      ? "这很难得。分数只是仪表，写下它为什么亮着，以后暗下来的时候才知道往哪儿找。"
+      : "这里没有好坏评判。分数只是仪表，写下原因，才知道可以从哪儿开始照看它。"}</p>
+    <p class="sheet-question">${bright ? "写一句：哪一处你最想守住，为什么？" : `写一句：「${low.label}」为什么是现在这个分数？`}</p>
+    <textarea id="noteInput" placeholder="${bright ? `比如：${high.label}有 ${high.score} 分，因为……` : `比如：${low.label}只有 ${low.score} 分，因为……`}">${escapeHTML(life.answers.dashboard.note || "")}</textarea>
     <p class="sheet-warn" id="noteWarn"></p>
     <div class="sheet-actions">
       <button class="btn btn-ghost" type="button" data-action="close">稍后</button>
@@ -708,28 +716,63 @@ const NEXT_PLANETS = [
   ["三岔路星", "三个五年奥德赛计划"]
 ];
 
+// Walking the full loop earns a look at the whole planet before the postcard arrives.
+function finale() {
+  closeSheet();
+  setOverview();
+  cam.spinUntil = clockNow + 3.2;
+  sound.sparkle();
+  showToast("走完一圈了。看看你的星球现在的样子。");
+  setTimeout(() => {
+    if (sheetState) return;
+    if (cam.mode === "overview") setFollow();
+    showPostcard();
+  }, 3000);
+}
+
+function postcardFile(url) {
+  try {
+    const bin = atob(url.split(",")[1]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    return new File([bytes], "我的小星球.png", { type: "image/png" });
+  } catch (error) {
+    return null;
+  }
+}
+
 function showPostcard() {
   const url = makePostcard();
+  // On a phone the system share sheet is the natural way out (save, WeChat, Xiaohongshu);
+  // elsewhere a plain download. Long-press on the image still works where neither does.
+  const touch = window.matchMedia?.("(pointer: coarse)").matches;
+  const file = touch ? postcardFile(url) : null;
+  const canShare = Boolean(file && navigator.canShare?.({ files: [file] }));
   const html = `
     <div class="sheet-kicker">星球日记 · 明信片</div>
     <h2 class="sheet-title" id="sheetTitle">这是你的星球，现在的样子。</h2>
-    <p class="sheet-story">长按图片保存。这只是这一季的快照，过一阵再来，它会因为你做的小事而变。</p>
+    <p class="sheet-story">${touch ? "长按图片可以保存。" : ""}这只是这一季的快照，过一阵再来，它会因为你做的小事而变。</p>
     <div class="postcard-wrap"><img src="${url}" alt="我的小星球明信片"></div>
     <div class="sheet-actions is-sticky">
-      <a class="btn btn-primary" href="${url}" download="我的小星球.png">保存明信片</a>
-      <button class="btn btn-ghost" type="button" data-action="edit">改写日记</button>
+      ${canShare
+        ? `<button class="btn btn-primary" type="button" data-action="share">分享明信片</button>`
+        : `<a class="btn btn-primary" href="${url}" download="我的小星球.png">保存明信片</a>`}
       <a class="btn btn-ghost" href="${FULL_URL}">继续旅程</a>
     </div>
     <ul class="next-planets">
       ${NEXT_PLANETS.map(([name, sub]) => `<li><span>${name}</span><span>${sub} · 筹建中</span></li>`).join("")}
     </ul>
     <p class="sheet-story" style="margin-top:10px;font-size:12px">其他星球正在建造。在此之前，“继续旅程”会带你进入完整问卷，进度已经接上。</p>
+    <button class="btn-text" type="button" data-action="edit">改写日记</button>
   `;
   const actions = {
     edit() {
       closeSheet();
       openDiary.editing = true;
       openDiary();
+    },
+    share() {
+      navigator.share({ files: [file], title: "我的小星球" }).catch(() => {});
     }
   };
   if (sheetState) {
@@ -1019,6 +1062,34 @@ els.overviewBtn.addEventListener("click", () => {
   else setOverview();
 });
 
+// A returning visitor is recognised: the intro says where they left off instead of explaining again.
+function renderIntro() {
+  const done = QUESTS.filter(q => isDone(q.id)).length;
+  if (!done) return;
+  const next = nextQuest();
+  els.intro.querySelector(".intro-kicker").textContent = `欢迎回来 · 星球 ${planet.code}`;
+  els.intro.querySelector("p").innerHTML = next
+    ? `你已经走过 ${done} 站，还剩 ${QUESTS.length - done} 站。<br>星球替你记着，接着走就好。`
+    : "星球还是你离开时的样子。<br>过了一阵，分数也许已经不一样了。<br>回去走走，改一改，再画一张新的明信片。";
+  els.startBtn.textContent = "回到星球";
+  els.startBtn.style.letterSpacing = "0.2em";
+  els.startBtn.style.paddingLeft = "calc(18px + 0.2em)";
+  els.intro.querySelector("small").textContent = next ? `下一站 · ${next.name}` : "6 个小站都走过了 · 随时可以改";
+}
+
+// The sheet is pinned to the bottom of the layout viewport; on iOS the keyboard covers that edge
+// without resizing it, so lift the sheet by the keyboard's height while one is up.
+if (window.visualViewport) {
+  const vv = window.visualViewport;
+  const fitSheet = () => {
+    const keyboard = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    els.sheet.style.bottom = keyboard > 80 ? `${keyboard}px` : "";
+    els.sheet.style.maxHeight = keyboard > 80 ? `${Math.max(240, vv.height - 12)}px` : "";
+  };
+  vv.addEventListener("resize", fitSheet);
+  vv.addEventListener("scroll", fitSheet);
+}
+
 els.startBtn.addEventListener("click", () => {
   sound.start();
   setFollow();
@@ -1037,6 +1108,8 @@ function updateCamera(dt, time) {
   const base = tmpV.copy(up).multiplyScalar(surfaceRadius(up));
   if (cam.mode === "intro" || cam.mode === "overview") {
     if (cam.mode === "intro") orbit.yaw += dt * 0.05;
+    // The finale turns the finished planet slowly once before the postcard comes up.
+    else if (time < (cam.spinUntil ?? 0)) orbit.yaw += dt * 0.28;
     orbitDirection(desired.dir);
     desired.look.set(0, cam.mode === "intro" ? INTRO_LOOK_Y : 0, 0);
     desired.up.set(0, 1, 0);
@@ -1527,6 +1600,7 @@ resize();
 syncWorld();
 world.snap();
 renderQuests();
+renderIntro();
 
 const clock = new THREE.Clock();
 let started = false;
