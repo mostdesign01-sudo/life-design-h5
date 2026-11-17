@@ -771,6 +771,10 @@ export function buildSignpost() {
   return { group, gem: lamp, halo };
 }
 
+// How much shorter the legs are than a realistic figure's; everything above them drops to match.
+const LEG = 0.78;
+export const TRAVELER_DROP = 0.38 * (1 - LEG);
+
 export function buildTraveler() {
   const group = new THREE.Group();
   const body = new THREE.Group();
@@ -784,7 +788,9 @@ export function buildTraveler() {
   const legs = [-1, 1].map(side => {
     const pivot = new THREE.Group();
     pivot.userData.keep = true;
-    pivot.position.set(side * 0.07, 0.38, 0);
+    // Storybook proportions: short sturdy legs under a big head (about 2.6 heads tall).
+    pivot.position.set(side * 0.075, 0.38 * LEG, 0);
+    pivot.scale.set(1.18, LEG, 1.18);
     const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.046, 0.28, 4, 10), pants);
     leg.position.y = -0.18;
     const boot = new THREE.Mesh(new RoundedBoxGeometry(0.1, 0.07, 0.16, 2, 0.025), mat(0x6b4429));
@@ -815,7 +821,7 @@ export function buildTraveler() {
     const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.22, 4, 10), jacket);
     arm.position.y = -0.13;
     arm.rotation.z = side * 0.12;
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.043, 10, 8), skin);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 10), skin);
     hand.position.set(side * 0.018, -0.28, 0);
     pivot.add(arm, hand);
     body.add(pivot);
@@ -827,14 +833,19 @@ export function buildTraveler() {
 
   const head = new THREE.Group();
   head.userData.keep = true;
-  head.position.y = 0.93;
-  head.scale.setScalar(0.84);
+  head.position.y = 1.0;
+  head.scale.setScalar(1.24);
   head.add(new THREE.Mesh(new THREE.SphereGeometry(0.165, 28, 20), skin));
   const eyes = [-1, 1].map(side => {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.019, 10, 8), mat(0x2a2230, { roughness: 0.3 }));
-    eye.position.set(side * 0.056, 0, 0.152);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.023, 12, 10), mat(0x2a2230, { roughness: 0.3 }));
+    eye.position.set(side * 0.06, -0.012, 0.15);
     eye.scale.y = 1.25;
     head.add(eye);
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), mat(0xf0a48c, { roughness: 1 }));
+    cheek.position.set(side * 0.098, -0.058, 0.128);
+    cheek.scale.set(1, 0.7, 0.35);
+    cheek.userData.noShadow = true;
+    head.add(cheek);
     return eye;
   });
   const hair = new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), hairMat);
@@ -854,7 +865,7 @@ export function buildTraveler() {
 
   const pack = new THREE.Group();
   pack.userData.keep = true;
-  pack.position.set(0, 0.58, -0.19);
+  pack.position.set(0, 0.58, -0.165);
   const canvas = mat(0x8c7a4e, { roughness: 0.95 });
   const bag = new THREE.Mesh(new RoundedBoxGeometry(0.3, 0.38, 0.18, 3, 0.05), canvas);
   pack.add(bag);
@@ -889,10 +900,32 @@ export function buildTraveler() {
     body.add(strap);
   });
 
+  // A cream scarf: a ring at the neck and a loose end that swings with the walk.
+  const scarfMat = mat(0xf3ead8, { roughness: 1 });
+  const wrap = new THREE.Mesh(new THREE.TorusGeometry(0.132, 0.046, 10, 24), scarfMat);
+  wrap.rotation.x = Math.PI / 2;
+  wrap.position.y = 0.8;
+  wrap.scale.set(1, 0.85, 1);
+  body.add(wrap);
+  const scarf = new THREE.Group();
+  scarf.userData.keep = true;
+  scarf.position.set(-0.08, 0.79, 0.15);
+  const tail = new THREE.Mesh(new RoundedBoxGeometry(0.075, 0.2, 0.03, 2, 0.012), scarfMat);
+  tail.position.y = -0.1;
+  scarf.add(tail);
+  scarf.rotation.z = 0.12;
+  scarf.rotation.x = -0.12;
+  body.add(scarf);
+
+  // Drop everything above the hips by what the legs lost.
+  body.children.forEach(child => {
+    if (!legs.includes(child)) child.position.y -= TRAVELER_DROP;
+  });
+
   addBlob(group, 0.3, 0.45);
   shadow(group);
   mergeStatic(body);
-  return { group, body, legs, arms, head, pack, charm, eyes };
+  return { group, body, legs, arms, head, pack, charm, eyes, scarf };
 }
 
 export function buildFarPlanets(rand) {

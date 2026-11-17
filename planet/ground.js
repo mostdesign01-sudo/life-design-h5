@@ -7,9 +7,10 @@ import {
 const GROUND_GLSL = /* glsl */`
   ${NOISE_GLSL}
   vec3 meadowOf(float p) {
-    vec3 a = vec3(0.706, 0.788, 0.333);
-    vec3 b = vec3(0.443, 0.627, 0.275);
-    vec3 c = vec3(0.208, 0.439, 0.298);
+    // Lush, slightly blue-leaning greens: under the warm sun a yellow-green meadow reads as straw.
+    vec3 a = vec3(0.545, 0.765, 0.310);
+    vec3 b = vec3(0.345, 0.620, 0.270);
+    vec3 c = vec3(0.165, 0.440, 0.285);
     return p < 0.5 ? mix(a, b, p * 2.0) : mix(b, c, (p - 0.5) * 2.0);
   }
   vec3 strawOf(float p) {
@@ -69,6 +70,7 @@ export function buildPlanet(aprons) {
   geometry.computeVertexNormals();
 
   const material = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, color: 0xffffff, envMapIntensity: 0.22 });
+  material.defines.TOON_GROUND = "";
   const uAprons = { value: aprons };
   patchMaterial(material, "ground", shader => {
     shader.uniforms.uHealth = shared.uHealth;
@@ -189,6 +191,7 @@ function grassMaterial() {
     side: THREE.DoubleSide,
     vertexColors: false
   });
+  material.defines.TOON_GROUND = "";
   patchMaterial(material, "grass", shader => {
     shader.uniforms.uTime = shared.uTime;
     shader.uniforms.uHealth = shared.uHealth;

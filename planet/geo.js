@@ -1,5 +1,44 @@
 import * as THREE from "three";
 
+// ---------- toon lighting ----------
+
+// Every lit surface here is a MeshStandardMaterial, so the cel look is installed once, in the
+// shared lighting chunks, rather than material by material:
+//  - direct light falls in two flat steps instead of a smooth ramp, wrapping a little past the
+//    terminator so the dusk side keeps a lit band;
+//  - cast shadows get a firmer edge, like an inked shape;
+//  - a thin rim on the sun-facing silhouette lifts props and the traveler off the ground.
+// The shadow side is then coloured by the ambient light alone (see MOODS in sky.js).
+{
+  const chunk = THREE.ShaderChunk;
+  const swap = (name, from, to) => {
+    if (!chunk[name].includes(from)) console.warn(`toon: ${name} did not match`);
+    chunk[name] = chunk[name].replace(from, to);
+  };
+  swap("lights_physical_pars_fragment",
+    "float dotNL = saturate( dot( geometryNormal, directLight.direction ) );",
+    `float toonNL = dot( geometryNormal, directLight.direction );
+	#ifdef TOON_GROUND
+	// Terrain stays one broad soft ramp: a hard step across a smooth sphere reads as a seam.
+	float dotNL = smoothstep( -0.16, 0.42, toonNL );
+	#else
+	float dotNL = 0.60 * smoothstep( -0.08, 0.0, toonNL ) + 0.40 * smoothstep( 0.44, 0.52, toonNL );
+	#endif`);
+  swap("lights_fragment_begin",
+    "directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;",
+    "directLight.color *= ( directLight.visible && receiveShadow ) ? smoothstep( 0.38, 0.62, getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) ) : 1.0;");
+  chunk.lights_fragment_end += `
+#if defined( STANDARD ) && NUM_DIR_LIGHTS > 0 && ! defined( TOON_GROUND )
+	float toonRim = 1.0 - saturate( dot( geometryNormal, geometryViewDir ) );
+	toonRim = smoothstep( 0.52, 0.66, toonRim ) * smoothstep( -0.2, 0.35, dot( geometryNormal, directionalLights[ 0 ].direction ) );
+	// Lift the silhouette to just above the fully lit step rather than adding light on top of it:
+	// an additive rim pushed every pale surface past the bloom threshold and fogged the frame.
+	vec3 toonLit = 1.1 * directionalLights[ 0 ].color * BRDF_Lambert( material.diffuseColor );
+	reflectedLight.directDiffuse = mix( reflectedLight.directDiffuse, max( reflectedLight.directDiffuse, toonLit ), toonRim );
+#endif
+`;
+}
+
 // The planet is small against what stands on it: a house is about a quarter of its radius, so the
 // horizon always curves and every stop reads at a glance.
 export const R = 4.4;

@@ -68,7 +68,7 @@ export function createWorld(canvas) {
   sc.near = 8;
   sc.far = 48;
   sun.shadow.bias = -0.0005;
-  sun.shadow.radius = 6;
+  sun.shadow.radius = 1.6;
   sun.shadow.blurSamples = 12;
   scene.add(sun, sun.target);
   const fill = new THREE.DirectionalLight(0xc4d2ff, 0.28);
