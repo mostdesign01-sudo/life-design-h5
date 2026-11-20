@@ -239,13 +239,19 @@ function grassMaterial() {
         vec3 g = groundColour(normalize(vPlanetDir), uHealth, uAprons);
         // Almost seamless with the ground in the troughs, lifting softly in warm sunlight where
         // the breeze rolls past; fade tip contrast with distance so far blades never fizz.
-        vec3 tip = g * vec3(1.15, 1.13, 0.94) + vec3(0.012, 0.025, 0.0);
+        // Shaded root to tinted tip, never bright to bright: a blade is a pixel or two wide on
+        // screen, so any lift in luminance turns into an isolated white speck that sparkles as
+        // the wind rolls the lawn. Tone and hue carry the texture instead.
+        vec3 rootC = g * 0.95;
+        vec3 tipC = g * vec3(1.0, 1.045, 0.965);
         float distFade = 1.0 - smoothstep(16.0, 30.0, length(vViewPosition));
         // Each tuft sits a little apart in tone from its neighbours: without that, a lawn lit by
         // one flat normal reads as a single painted colour, with no grass in it at all.
-        float tuftTone = hash13(floor(normalize(vPlanetDir) * 150.0));
-        diffuseColor.rgb *= 0.95 + 0.10 * tuftTone;
-        diffuseColor.rgb = mix(diffuseColor.rgb, tip, vH * (0.5 + 0.5 * vWave) * distFade);`)
+        // A smooth drift of tone across the meadow, never a per-tuft random value: at a distance
+        // a per-tuft value puts one brighter tuft next to a darker one and the lawn glitters.
+        float tuftTone = vnoise(normalize(vPlanetDir) * 9.0);
+        diffuseColor.rgb *= 0.975 + 0.05 * tuftTone;
+        diffuseColor.rgb = mix(rootC * (0.975 + 0.05 * tuftTone), tipC * (0.975 + 0.05 * tuftTone), vH * (0.5 + 0.4 * vWave) * distFade);`)
       // Blades are two-sided, and the renderer flips the normal on a back face: half the lawn was
       // being lit as if it faced the ground. Both sides take the ground's normal.
       .replace("#include <normal_fragment_begin>", `#include <normal_fragment_begin>

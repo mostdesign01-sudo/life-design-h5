@@ -113,7 +113,11 @@ const FinishShader = {
         + texture2D(tDiffuse, vUv - vec2(uTexel.x, 0.0)).rgb
         + texture2D(tDiffuse, vUv + vec2(0.0, uTexel.y)).rgb
         + texture2D(tDiffuse, vUv - vec2(0.0, uTexel.y)).rgb;
-      c += (c * 4.0 - around) * 0.07;
+      // Weighted by how much local contrast there already is: flat lawn and sky stay untouched,
+      // so the sharpen cannot mint isolated bright dots out of the grass texture.
+      float localRange = max(max(abs(c.r - around.r * 0.25), abs(c.g - around.g * 0.25)), abs(c.b - around.b * 0.25));
+      float sharpen = 0.045 * smoothstep(0.07, 0.22, localRange) * (1.0 - smoothstep(0.35, 0.9, localRange));
+      c += (c * 4.0 - around) * sharpen;
       if (uOutline > 0.0) c = mix(c, c * uInk, inkLine() * uOutline);
       // Contrast around scene mid-grey: deepens the shadow side and clears the milky veil that
       // ambient light, bloom and haze add up to.
@@ -153,7 +157,7 @@ export function createPost(renderer, scene, hole) {
   }
   let target = makeTarget();
 
-  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.28, 0.5, 0.98);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.28, 0.5, 1.06);
   // Bloom is added to the colour only: the alpha channel carries the outline mask.
   bloom.blendMaterial.blending = THREE.CustomBlending;
   bloom.blendMaterial.blendSrc = THREE.SrcAlphaFactor;
