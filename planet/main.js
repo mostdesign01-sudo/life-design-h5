@@ -1612,19 +1612,34 @@ let started = false;
 // Measure the frame rate for a few seconds and step effects down on slower phones.
 // `?quality=0|1|2` in the URL pins a level instead.
 const pinnedQuality = new URLSearchParams(location.search).get("quality");
-const perf = { frames: 0, time: 0, done: pinnedQuality !== null };
+const perf = { frames: 0, time: 0, done: pinnedQuality !== null, settle: 0 };
 if (pinnedQuality !== null) world.setQuality(Number(pinnedQuality));
 
+// Step effects down on a slow device, but measure past the first seconds (shader compilation
+// stalls the first frames) and step back up when the machine turns out to be fine after all.
 function measure(dt, time) {
   if (perf.done || time < 1.5) return;
   perf.frames += 1;
   perf.time += dt;
   if (perf.time < 3) return;
-  perf.done = true;
   const fps = perf.frames / perf.time;
-  if (fps < 24) world.setQuality(0);
-  else if (fps < 40) world.setQuality(1);
+  if (!perf.settled) {
+    perf.settled = true;
+    if (fps < 24) world.setQuality(0);
+    else if (fps < 40) world.setQuality(1);
+    return;
+  }
+  perf.settle = fps > 52 ? perf.settle + 1 : 0;
+  if (perf.settle >= 2 && world.quality < 2) {
+    perf.settle = 0;
+    world.setQuality(2);
+  }
+  perf.frames = 0;
+  perf.time = 0;
 }
+
+// The first 1.5 s are compile and texture upload, not a frame rate.
+const warmup = { done: false, at: 0 };
 
 const focusPoint = new THREE.Vector3();
 
@@ -1656,8 +1671,10 @@ function frame() {
   const rawDt = clock.getDelta();
   const dt = Math.min(rawDt, 0.05);
   const time = clock.elapsedTime;
+  // The opening seconds compile shaders and upload textures: never read those frames as a fps dip.
+  if (!warmup.done && time > 2.5) warmup.done = true;
   measure(rawDt, time);
-  if (pinnedQuality === null) world.noteFrameTime?.(rawDt * 1000);
+  if (pinnedQuality === null) world.noteFrameTime?.(warmup.done ? rawDt * 1000 : 0);
   clockNow = time;
   world.update(dt, time);
   sound.tick(Number(life.answers.dashboard.play ?? 5) / 10);

@@ -139,14 +139,14 @@ export function buildAtmosphere() {
   return { mesh, material };
 }
 
-const TUFT_H = 0.115;
+const TUFT_H = 0.14;
 // The breeze blows one way across the whole planet; every blade leans with it.
 const WIND = new THREE.Vector3(0.82, 0.1, -0.56).normalize();
 
 // A soft velvet tuft rather than spiky needles: fewer, broader blades leaning gently downwind so
 // neighbouring tufts blend into one calm carpet instead of breaking up into pixel-wide stripes.
 function tuftGeometry() {
-  const blades = 6;
+  const blades = 7;
   const segs = 2;
   const positions = [];
   const normals = [];
@@ -160,7 +160,7 @@ function tuftGeometry() {
     const face = rand() * Math.PI;
     const lean = 0.03 + rand() * 0.015;
     const h = TUFT_H * (0.86 + rand() * 0.14);
-    const w = 0.044;
+    const w = 0.05;
     const width = t => w * (1 - t * t * 0.72);
     for (let s = 0; s < segs; s += 1) {
       const t0 = s / segs;
@@ -239,9 +239,13 @@ function grassMaterial() {
         vec3 g = groundColour(normalize(vPlanetDir), uHealth, uAprons);
         // Almost seamless with the ground in the troughs, lifting softly in warm sunlight where
         // the breeze rolls past; fade tip contrast with distance so far blades never fizz.
-        vec3 tip = g * vec3(1.10, 1.09, 0.94) + vec3(0.012, 0.022, 0.0);
-        float distFade = 1.0 - smoothstep(5.5, 13.5, length(vViewPosition));
-        diffuseColor.rgb = mix(g, tip, vH * (0.16 + 0.84 * vWave) * distFade);`)
+        vec3 tip = g * vec3(1.15, 1.13, 0.94) + vec3(0.012, 0.025, 0.0);
+        float distFade = 1.0 - smoothstep(16.0, 30.0, length(vViewPosition));
+        // Each tuft sits a little apart in tone from its neighbours: without that, a lawn lit by
+        // one flat normal reads as a single painted colour, with no grass in it at all.
+        float tuftTone = hash13(floor(normalize(vPlanetDir) * 150.0));
+        diffuseColor.rgb *= 0.95 + 0.10 * tuftTone;
+        diffuseColor.rgb = mix(diffuseColor.rgb, tip, vH * (0.5 + 0.5 * vWave) * distFade);`)
       // Blades are two-sided, and the renderer flips the normal on a back face: half the lawn was
       // being lit as if it faced the ground. Both sides take the ground's normal.
       .replace("#include <normal_fragment_begin>", `#include <normal_fragment_begin>

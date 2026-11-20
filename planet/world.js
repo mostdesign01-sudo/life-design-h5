@@ -495,10 +495,8 @@ export function createWorld(canvas) {
     post.setTiltShift(tiltShift);
     post.setBloom(level >= 1);
     post.setSamples(level >= 1 ? 4 : 0);
-    if (level < 2) pixelRatio = Math.min(pixelRatio, 1.25);
-    if (level < 1) {
-      pixelRatio = 1;
-    }
+    if (level < 2) pixelRatio = Math.min(pixelRatio, mobile ? 1.25 : 1.75);
+    if (level < 1) pixelRatio = Math.min(pixelRatio, mobile ? 1 : 1.5);
     grass.setCount(level >= 2 ? 1 : level >= 1 ? 0.7 : 0.45);
     setSize(window.innerWidth, window.innerHeight);
   }
@@ -558,6 +556,7 @@ export function createWorld(canvas) {
   return {
     renderer, scene, camera, sky, clouds: clouds.group, trees: trees.map(t => t.group), bushes, objects, farPlanets, blockers,
     setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust, celebrate, setDiaryReady, setNearCull,
-    setFocus: post.setFocus, setSeeThrough, noteFrameTime, get resolutionScale() { return resolutionScale; }
+    setFocus: post.setFocus, setSeeThrough, noteFrameTime, get resolutionScale() { return resolutionScale; },
+    get quality() { return qualityLevel; }
   };
 }

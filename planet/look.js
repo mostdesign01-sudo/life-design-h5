@@ -10,7 +10,7 @@ const FinishShader = {
     tDiffuse: { value: null },
     toneMappingExposure: { value: 1 },
     uTexel: { value: new THREE.Vector2(1, 1) },
-    uBlur: { value: 1.6 },
+    uBlur: { value: 0.6 },
     uFocus: { value: 0.45 },
     uSaturation: { value: 1.2 },
     uVignette: { value: 0.9 },
@@ -101,9 +101,19 @@ const FinishShader = {
     void main() {
       vec3 c = texture2D(tDiffuse, vUv).rgb;
       #ifdef TILT_SHIFT
-        vec2 scale = uTexel * uBlur * abs(uFocus - vUv.y);
+        // Only the far top and bottom lose focus: the whole play area around the traveler stays
+        // crisp, so the miniature feel comes from composition rather than from a soft image.
+        float fall = smoothstep(0.24, 0.56, abs(uFocus - vUv.y));
+        vec2 scale = uTexel * uBlur * fall * fall;
         c = c * 0.12 + ring(1.3, 5.0, 0.0, 0.07, scale) + ring(2.9, 5.0, 0.63, 0.06, scale) + ring(4.6, 6.0, 0.26, 0.23 / 6.0, scale);
       #endif
+      // Gentle unsharp mask: a low-poly scene has few edges, and the bloom plus tilt-shift rounds
+      // every one of them off. Recovering a little local contrast keeps the frame from reading soft.
+      vec3 around = texture2D(tDiffuse, vUv + vec2(uTexel.x, 0.0)).rgb
+        + texture2D(tDiffuse, vUv - vec2(uTexel.x, 0.0)).rgb
+        + texture2D(tDiffuse, vUv + vec2(0.0, uTexel.y)).rgb
+        + texture2D(tDiffuse, vUv - vec2(0.0, uTexel.y)).rgb;
+      c += (c * 4.0 - around) * 0.07;
       if (uOutline > 0.0) c = mix(c, c * uInk, inkLine() * uOutline);
       // Contrast around scene mid-grey: deepens the shadow side and clears the milky veil that
       // ambient light, bloom and haze add up to.
