@@ -171,162 +171,218 @@ root = bpy.data.objects.new("Traveler", None)
 root.empty_display_size = 0.2
 bpy.context.collection.objects.link(root)
 
-# palette from the character sheet
-SKIN = mat("Skin", "#F2CFB2", 0.72)
-SKIN_SHADE = mat("SkinShade", "#E0B396", 0.75)
-JACKET = mat("Jacket", "#CC6B4B", 0.9)
-JACKET_DARK = mat("JacketDark", "#A8503A", 0.9)
-CREAM = mat("Cream", "#F8EED7", 0.95)
-BEANIE = mat("Beanie", "#489D9B", 0.95)
-BEANIE_DARK = mat("BeanieDark", "#3A8280", 0.95)
-PANTS = mat("Pants", "#465761", 0.92)
-BOOT = mat("Boot", "#6B4A2F", 0.85)
-BOOT_SOLE = mat("BootSole", "#4B362F", 0.9)
-CANVAS = mat("Canvas", "#B4A887", 0.95)
-CANVAS_DARK = mat("CanvasDark", "#8E8467", 0.95)
-BEDROLL = mat("Bedroll", "#AB4237", 0.92)
-WOOD = mat("Wood", "#7A5634", 0.85)
-INK = mat("Ink", "#3B2A20", 0.55)
-BLUSH = mat("Blush", "#E89B8B", 0.9)
+# palette read off the character sheet
+SKIN = mat("Skin", "#F5D3B6", 1.0)
+SKIN_SHADE = mat("SkinShade", "#E3B697", 1.0)
+JACKET = mat("Jacket", "#D2734F", 1.0)
+JACKET_DARK = mat("JacketDark", "#B0583C", 1.0)
+CREAM = mat("Cream", "#F8EED7", 1.0)
+BEANIE = mat("Beanie", "#4E9C99", 1.0)
+BEANIE_DARK = mat("BeanieDark", "#3E8583", 1.0)
+PANTS = mat("Pants", "#4A5A64", 1.0)
+BOOT = mat("Boot", "#6E4B2F", 1.0)
+BOOT_SOLE = mat("BootSole", "#4B362F", 1.0)
+CANVAS = mat("Canvas", "#B4A887", 1.0)
+CANVAS_DARK = mat("CanvasDark", "#8E8467", 1.0)
+BEDROLL = mat("Bedroll", "#B0483B", 1.0)
+WOOD = mat("Wood", "#7A5634", 1.0)
+INK = mat("Ink", "#3B2A20", 0.75)
+INK_COLOR = "#4B362F"
+BLUSH = mat("Blush", "#EDA48F", 1.0)
 METAL = mat("LampMetal", "#6E6255", 0.45, 0.6)
 GLOW = mat("LampGlow", "#FFE6A8", 0.4, 0.0, emit="#FFC35A", emit_strength=12.0)
 
-# ---------------------------------------------------------------- body
-# Proportion target from the character sheet: a little over 2.5 heads, head about 38% of the
-# height, short thick legs, chunky boots. Total 1.29 units tall.
+# Everything here is flat-shaded cloth: kill the plastic specular so the preview reads like the
+# illustration rather than like a toy.
+for m in MATS.values():
+    bsdf = m.node_tree.nodes.get("Principled BSDF")
+    if bsdf and "Specular IOR Level" in bsdf.inputs:
+        bsdf.inputs["Specular IOR Level"].default_value = 0.15 if m.name != "LampMetal" else 0.6
 
+# ---------------------------------------------------------------- legs and boots
+# 2.5 heads: short thick legs, boots as big as a fist.
 for side in (-1, 1):
     tag = "L" if side < 0 else "R"
-    cyl("Leg" + tag, (side * 0.086, 0, 0.255), 0.070, 0.062, 0.28, 20, PANTS, root)
-    sphere("Knee" + tag, (side * 0.086, 0, 0.128), 0.066, (1, 1, 0.92), 20, 12, PANTS, root)
-    box("Boot" + tag, (side * 0.086, -0.03, 0.085), (0.128, 0.20, 0.125), 0.05, 4, BOOT, root)
-    box("Sole" + tag, (side * 0.086, -0.032, 0.026), (0.138, 0.215, 0.052), 0.022, 3, BOOT_SOLE, root)
+    cyl("Leg" + tag, (side * 0.090, 0, 0.215), 0.076, 0.068, 0.21, 20, PANTS, root)
+    cyl("BootShaft" + tag, (side * 0.090, 0, 0.120), 0.079, 0.076, 0.10, 20, BOOT, root)
+    torus("BootCuff" + tag, (side * 0.090, 0, 0.170), 0.079, 0.017, BOOT, root)
+    # rounded toe that tips up, so the boot reads as heavy leather rather than as a box
+    sphere("BootToe" + tag, (side * 0.090, -0.055, 0.073), 0.081, (1.0, 1.24, 0.80), 24, 14, BOOT, root)
+    box("BootSole" + tag, (side * 0.090, -0.026, 0.026), (0.176, 0.246, 0.044), 0.019, 3, BOOT_SOLE, root)
+    torus("BootSeam" + tag, (side * 0.090, -0.02, 0.140), 0.080, 0.005, BOOT_SOLE, root, scale=(1, 1.1, 1))
 
-# jacket: a heavily rounded box reads as a soft anorak
-box("Jacket", (0, 0, 0.545), (0.36, 0.27, 0.40), 0.085, 6, JACKET, root)
-torus("Hem", (0, 0, 0.356), 0.163, 0.030, JACKET_DARK, root, scale=(1, 0.88, 1))
-torus("Collar", (0, 0, 0.728), 0.135, 0.034, JACKET_DARK, root, scale=(1, 0.88, 1))
-box("Zip", (0, -0.150, 0.545), (0.022, 0.014, 0.352), 0.005, 2, CREAM, root)
-sphere("ZipPull", (0, -0.158, 0.706), 0.019, (1, 0.55, 1.35), 14, 10, JACKET_DARK, root)
-torus("ZipRing", (0, -0.157, 0.682), 0.016, 0.005, JACKET_DARK, root, rot=(math.pi / 2, 0, 0), maj=14, minr=6)
+# ---------------------------------------------------------------- jacket
+box("Jacket", (0, 0, 0.532), (0.375, 0.285, 0.395), 0.075, 6, JACKET, root)
+torus("Hem", (0, 0, 0.345), 0.179, 0.026, JACKET_DARK, root, scale=(1, 0.9, 1))
+torus("Collar", (0, 0, 0.712), 0.143, 0.031, JACKET_DARK, root, scale=(1, 0.9, 1))
+box("Zip", (0, -0.152, 0.545), (0.020, 0.013, 0.325), 0.005, 2, CREAM, root)
+sphere("ZipPull", (0, -0.159, 0.706), 0.018, (1, 0.55, 1.35), 14, 10, JACKET_DARK, root)
+torus("ZipRing", (0, -0.158, 0.682), 0.015, 0.005, JACKET_DARK, root, rot=(math.pi / 2, 0, 0), maj=14, minr=6)
+# slanted hand pockets and a pinch of fabric under each arm, the only folds the sheet gives
+for side in (-1, 1):
+    tag = "L" if side < 0 else "R"
+    box("Pocket" + tag, (side * 0.104, -0.150, 0.452), (0.098, 0.016, 0.026), 0.006, 2, JACKET_DARK, root,
+        rot=(0, side * 0.38, 0))
+    box("PocketLip" + tag, (side * 0.104, -0.156, 0.470), (0.104, 0.012, 0.016), 0.005, 2, JACKET, root,
+        rot=(0, side * 0.38, 0))
 
-# arms: hinged at the shoulder so a rig can swing them later; the right one is turned down and
-# forward a little so the hand actually sits on the staff instead of beside it.
+# ---------------------------------------------------------------- arms
 for side in (-1, 1):
     tag = "L" if side < 0 else "R"
     grip = side > 0
-    cyl("Arm" + tag, (side * 0.192, -0.012 if grip else 0, 0.565), 0.056, 0.047, 0.24, 18, JACKET, root,
-        rot=(-0.16 if grip else 0, side * -0.10, 0))
-    sphere("Shoulder" + tag, (side * 0.183, 0, 0.678), 0.066, (1, 0.95, 0.95), 20, 12, JACKET, root)
-    torus("Cuff" + tag, (side * 0.20, -0.03 if grip else 0, 0.448), 0.048, 0.016, JACKET_DARK, root)
-    sphere("Hand" + tag, (0.224 if grip else side * 0.207, -0.05 if grip else -0.012, 0.44 if grip else 0.402),
-           0.054, (0.95, 1.02, 1.0), 24, 14, SKIN, root)
+    sphere("Shoulder" + tag, (side * 0.190, 0, 0.664), 0.070, (1, 0.95, 0.95), 22, 14, JACKET, root)
+    cyl("Arm" + tag, (side * 0.198, -0.012 if grip else 0, 0.552), 0.060, 0.051, 0.235, 20, JACKET, root,
+        rot=(-0.14 if grip else 0, side * -0.10, 0))
+    for k, wz in enumerate((0.60, 0.52)):
+        torus("SleeveFold%s%d" % (tag, k), (side * (0.196 + 0.004 * k), -0.008 if grip else 0, wz),
+              0.058 - 0.002 * k, 0.007, JACKET_DARK, root, rot=(0.05, side * -0.1, 0))
+    torus("Cuff" + tag, (side * 0.212, -0.03 if grip else 0, 0.442), 0.050, 0.017, JACKET_DARK, root)
+    sphere("Hand" + tag, (0.233 if grip else side * 0.206, -0.052 if grip else -0.004,
+                          0.433 if grip else 0.408),
+           0.052 if grip else 0.046, (1.0, 1.05, 0.98), 24, 16, SKIN, root)
+
+# a thumb over the staff, so the hand reads as gripping rather than touching
+sphere("ThumbR", (0.241, -0.071, 0.452), 0.027, (1.05, 1.0, 1.3), 16, 12, SKIN, root)
+sphere("ThumbL", (-0.196, -0.028, 0.420), 0.022, (1.0, 1.0, 1.3), 16, 12, SKIN, root)
 
 # ---------------------------------------------------------------- head
-
-HEAD_Z = 0.945
-HEAD_R = 0.242
-sphere("Head", (0, 0, HEAD_Z), HEAD_R, (1, 1, 1), 44, 26, SKIN, root)
-
+HEAD_R = 0.258
+HEAD_Z = 0.952
+sphere("Head", (0, 0, HEAD_Z), HEAD_R, (1.0, 0.99, 1.02), 48, 28, SKIN, root)
 for side in (-1, 1):
-    sphere("Ear" + ("L" if side < 0 else "R"), (side * 0.243, 0.012, HEAD_Z - 0.012), 0.045,
-           (0.55, 0.85, 1.0), 16, 12, SKIN, root)
+    sphere("Ear" + ("L" if side < 0 else "R"), (side * 0.250, 0.014, HEAD_Z - 0.012), 0.046,
+           (0.5, 0.85, 1.0), 16, 12, SKIN, root)
 
 
 def on_face(x, dz, out=0.0):
-    """Y of the head surface at (x, HEAD_Z + dz), pushed `out` along -Y."""
+    """Y of the head surface at (x, HEAD_Z + dz), pushed `out` towards the viewer (-Y)."""
     depth = HEAD_R * HEAD_R - x * x - dz * dz
     return -math.sqrt(max(depth, 0.0)) + out
 
 
+def face_arc(name, cx, cz, radius, a0, a1, width, material, steps=18, flip=False, out=0.007):
+    """A line drawn *on* the head: every point sits on the surface, so the ends do not sink in."""
+    pts = []
+    for i in range(steps + 1):
+        a = math.radians(a0 + (a1 - a0) * i / steps)
+        x = cx + radius * math.cos(a)
+        dz = cz + (1 if flip else -1) * radius * math.sin(a) * 0.55
+        pts.append((x, on_face(x, dz, out), HEAD_Z + dz))
+    return poly_curve(name, pts, width, material, root)
+
+
+# The sheet's resting face: two solid black dots, a small upward smile, soft oval blush, and brows
+# that sit a little low so the character reads calm rather than startled.
 for side in (-1, 1):
     tag = "L" if side < 0 else "R"
-    ex, ez = side * 0.092, -0.042
-    ey = on_face(ex, ez, 0.004)
-    sphere("Eye" + tag, (ex, ey, HEAD_Z + ez), 0.032, (1, 0.30, 1.10), 24, 16, INK, root)
-    cx, cz = side * 0.156, -0.092
-    sphere("Cheek" + tag, (cx, on_face(cx, cz, 0.003), HEAD_Z + cz), 0.044, (1, 0.26, 0.70), 18, 12, BLUSH, root)
-arc("Mouth", 0, on_face(0, -0.128, 0.012), HEAD_Z - 0.128, 0.036, 204, 336, 0.0105, INK, root, steps=18)
-sphere("Nose", (0, on_face(0, -0.082, 0.010), HEAD_Z - 0.082), 0.014, (1, 0.75, 0.9), 14, 10, SKIN_SHADE, root)
+    ex, ez = side * 0.098, -0.040
+    sphere("Eye" + tag, (ex, on_face(ex, ez, 0.006), HEAD_Z + ez), 0.037, (1, 0.55, 1.02), 26, 18, INK, root)
+    face_arc("Brow" + tag, side * 0.101, 0.022, 0.038, 218, 322, 0.0070, INK, steps=16)
+    cx, cz = side * 0.154, -0.090
+    sphere("Cheek" + tag, (cx, on_face(cx, cz, 0.004), HEAD_Z + cz), 0.052, (1, 0.20, 0.56), 20, 14, BLUSH, root)
+# flip=True puts the low point in the middle: a smile, not a frown
+face_arc("Mouth", 0.0, -0.150, 0.030, 208, 332, 0.0070, INK, steps=18, flip=True)
+sphere("Nose", (0, on_face(0, -0.090, 0.010), HEAD_Z - 0.090), 0.013, (1, 0.8, 0.9), 14, 10, SKIN_SHADE, root)
 
-# hair peeking out from under the hat
-dome("Hair", (0, 0.004, HEAD_Z), HEAD_R * 1.022, cut=0.02, seg=40, ring=18, material=INK, parent=root)
-# fringe curls at the edge of the knit cap, following the head surface
-# fringe: three curls over the forehead, the topmost edge of the hair under the cap
-for i, (fx, fz) in enumerate(((-0.105, 0.088), (-0.035, 0.080), (0.040, 0.082), (0.108, 0.090))):
-    fy = -math.sqrt(max((HEAD_R * 1.03) ** 2 - fx * fx - fz * fz, 0.0))
-    sphere("Fringe%d" % i, (fx, fy * 0.99, HEAD_Z + fz), 0.030, (1.05, 0.6, 0.72), 16, 12, INK, root)
+# ---------------------------------------------------------------- hair
+# A dark band under the cap, with a soft fringe over the forehead and short sideburns in front of
+# the ears: the sheet shows hair as a shape that frames the face, not as a cap of its own.
+dome("Hair", (0, 0.004, HEAD_Z), HEAD_R * 1.014, cut=0.155, seg=44, ring=20, material=INK, parent=root)
+for i, (fx, fz, fr) in enumerate(((-0.150, 0.062, 0.032), (-0.080, 0.070, 0.036),
+                                  (0.004, 0.064, 0.038), (0.086, 0.070, 0.035), (0.154, 0.064, 0.031))):
+    fy = on_face(fx, fz, 0.004)
+    sphere("Fringe%d" % i, (fx, fy * 0.99, HEAD_Z + fz), fr, (1.0, 0.72, 0.92), 18, 12, INK, root)
+for side in (-1, 1):
+    sphere("Sideburn" + ("L" if side < 0 else "R"), (side * 0.243, -0.028, HEAD_Z + 0.012), 0.050,
+           (0.45, 0.85, 1.15), 16, 12, INK, root)
 
-for i, a in enumerate((-1.32, -0.62, 0.22, 1.05)):
-    tx, tz = 0.235 * math.sin(a), -0.045 + 0.02 * abs(a)
-    ty = -math.sqrt(max(HEAD_R * HEAD_R * 1.01 - tx * tx - tz * tz, 0.0))
-    sphere("Tuft%d" % i, (tx, ty * 0.98, HEAD_Z + tz), 0.036, (1.1, 0.7, 0.95), 14, 10, INK, root)
-
-# beanie: dome + knit brim with ribs + pompom
-dome("Beanie", (0, 0, HEAD_Z + 0.012), HEAD_R * 1.035, cut=0.04, seg=36, ring=18,
+# ---------------------------------------------------------------- beanie
+dome("Beanie", (0, 0, HEAD_Z + 0.010), HEAD_R * 1.055, cut=0.02, seg=40, ring=20,
      material=BEANIE, parent=root)
-torus("BeanieBrim", (0, 0, HEAD_Z + 0.126), 0.230, 0.044, BEANIE_DARK, root, scale=(1, 1.0, 1), maj=44, minr=14)
-for i in range(16):
-    a = math.tau * i / 16
-    box("Rib%d" % i, (0.259 * math.cos(a), 0.259 * math.sin(a), HEAD_Z + 0.112),
-        (0.016, 0.015, 0.082), 0.005, 2, BEANIE, root, rot=(0, 0, a))
-sphere("Pompom", (0, 0, HEAD_Z + 0.295), 0.058, (1, 1, 0.92), 20, 14, CREAM, root)
-for i, (dx, dy, dz) in enumerate(((0.052, 0.012, 0.018), (-0.052, -0.014, 0.026),
-                                  (0.012, 0.052, -0.03), (-0.014, -0.05, -0.02))):
-    sphere("PompomLobe%d" % i, (dx, dy, HEAD_Z + 0.295 + dz), 0.033, (1, 1, 1), 14, 10, CREAM, root)
+# knit: shallow vertical ribs running up the dome
+bm = bmesh.new()
+bm.from_mesh(bpy.data.objects["Beanie"].data)
+for v in bm.verts:
+    a = math.atan2(v.co.y, v.co.x)
+    v.co *= 1.0 + 0.010 * math.cos(14.0 * a)
+bm.to_mesh(bpy.data.objects["Beanie"].data)
+bm.free()
 
-# ---------------------------------------------------------------- neck
-cyl("Neck", (0, 0, 0.70), 0.072, 0.076, 0.10, 18, SKIN, root)
+# rolled brim, ribbed: waves running around the fold read as cabling
+bpy.ops.mesh.primitive_torus_add(major_radius=0.246, minor_radius=0.047, major_segments=144,
+                                 minor_segments=18, location=(0, 0, HEAD_Z + 0.124))
+brim = bpy.context.object
+bm = bmesh.new()
+bm.from_mesh(brim.data)
+for v in bm.verts:
+    rad = math.hypot(v.co.x, v.co.y)
+    if rad < 1e-6:
+        continue
+    a = math.atan2(v.co.y, v.co.x)
+    wave = 0.012 * math.cos(14.0 * a)
+    v.co.x += math.cos(a) * wave
+    v.co.y += math.sin(a) * wave
+bm.to_mesh(brim.data)
+bm.free()
+finish(brim, "BeanieBrim", BEANIE_DARK, True, root)
+
+# pompom: a felted ball with a couple of lobes, not a perfect sphere
+sphere("Pompom", (0, 0, HEAD_Z + 0.302), 0.061, (1.02, 1.0, 0.94), 24, 16, CREAM, root)
+for i, (dx, dy, dz, dr) in enumerate(((0.052, 0.014, 0.010, 0.036), (-0.054, -0.012, 0.020, 0.034),
+                                      (0.010, 0.054, -0.026, 0.033), (-0.014, -0.052, -0.014, 0.031),
+                                      (0.02, 0.01, 0.052, 0.030))):
+    sphere("PompomLobe%d" % i, (dx, dy, HEAD_Z + 0.302 + dz), dr, (1, 1, 1), 16, 12, CREAM, root)
 
 # ---------------------------------------------------------------- scarf
-
-torus("ScarfWrap", (0, 0, 0.75), 0.155, 0.058, CREAM, root, scale=(1, 0.94, 0.80), maj=36, minr=14)
-torus("ScarfFold", (0, 0, 0.702), 0.158, 0.040, CREAM, root, scale=(1, 0.92, 0.9), maj=36, minr=12)
-box("ScarfTail", (0.078, -0.126, 0.625), (0.092, 0.038, 0.185), 0.024, 3, CREAM, root, rot=(0.16, 0, 0.08))
-box("ScarfTailEnd", (0.082, -0.129, 0.537), (0.086, 0.034, 0.032), 0.012, 2, CREAM, root, rot=(0.16, 0, 0.08))
+# Wound tight: three offset coils read as cloth folds; one end hangs flat on the chest, one
+# trails off behind the shoulder.
+torus("ScarfWrap", (0, 0, 0.752), 0.158, 0.056, CREAM, root, scale=(1, 0.94, 0.80), maj=40, minr=16)
+torus("ScarfFold", (0, 0, 0.713), 0.163, 0.046, CREAM, root, scale=(1, 0.92, 0.92), maj=40, minr=14)
+torus("ScarfLow", (0, 0, 0.682), 0.158, 0.034, CREAM, root, scale=(1, 0.9, 0.95), maj=36, minr=12)
+poly_curve("ScarfTail", [(0.072, -0.142, 0.722), (0.086, -0.163, 0.672), (0.082, -0.176, 0.612),
+                         (0.066, -0.174, 0.560)], 0.034, CREAM, root)
+poly_curve("ScarfTailEnd", [(0.066, -0.174, 0.566), (0.058, -0.176, 0.540), (0.044, -0.172, 0.524)],
+           0.028, CREAM, root)
+poly_curve("ScarfTrail", [(-0.070, 0.030, 0.740), (-0.132, 0.072, 0.706), (-0.170, 0.086, 0.664),
+                          (-0.186, 0.080, 0.626)], 0.030, CREAM, root)
 
 # ---------------------------------------------------------------- backpack
-
-box("PackBody", (0, 0.212, 0.60), (0.30, 0.20, 0.355), 0.06, 5, CANVAS, root)
-box("PackFlap", (0, 0.222, 0.775), (0.308, 0.212, 0.078), 0.032, 4, CANVAS, root)
-box("PackPocket", (0, 0.31, 0.525), (0.165, 0.05, 0.13), 0.02, 3, CANVAS_DARK, root)
-box("PackBuckle", (0, 0.315, 0.60), (0.038, 0.022, 0.058), 0.008, 2, BOOT_SOLE, root)
-cyl("Bedroll", (0, 0.222, 0.845), 0.075, 0.075, 0.38, 20, BEDROLL, root, rot=(0, math.pi / 2, 0))
-for x in (-0.12, 0.12):
-    torus("BedrollTie%d" % int(x * 1000), (x, 0.222, 0.845), 0.077, 0.010, BOOT_SOLE, root,
-          rot=(0, math.pi / 2, 0), maj=20, minr=8)
+box("PackBody", (0, 0.216, 0.575), (0.335, 0.215, 0.355), 0.062, 5, CANVAS, root)
+box("PackFlap", (0, 0.224, 0.748), (0.343, 0.228, 0.088), 0.032, 4, CANVAS, root)
+box("PackPocket", (0, 0.328, 0.500), (0.190, 0.052, 0.140), 0.022, 3, CANVAS_DARK, root)
+box("PackBuckle", (0, 0.332, 0.585), (0.040, 0.024, 0.058), 0.008, 2, BOOT_SOLE, root)
+box("PackSeam", (0, 0.327, 0.432), (0.196, 0.010, 0.012), 0.004, 2, CANVAS_DARK, root)
+cyl("Bedroll", (0, 0.222, 0.840), 0.079, 0.079, 0.40, 24, BEDROLL, root, rot=(0, math.pi / 2, 0))
+for x in (-0.128, 0.128):
+    torus("BedrollTie%d" % int(x * 1000), (x, 0.222, 0.840), 0.081, 0.011, BOOT_SOLE, root,
+          rot=(0, math.pi / 2, 0), maj=22, minr=8)
+    box("BedrollStrap%d" % int(x * 1000), (x, 0.222, 0.786), (0.026, 0.040, 0.070), 0.006, 2, BOOT_SOLE, root)
 for side in (-1, 1):
-    # The straps have to sit proud of the jacket, or they vanish inside it.
-    box("Strap" + ("L" if side < 0 else "R"), (side * 0.094, -0.152, 0.60),
-        (0.046, 0.030, 0.31), 0.012, 3, CANVAS_DARK, root, rot=(0.05, 0, 0))
-    box("StrapTop" + ("L" if side < 0 else "R"), (side * 0.094, 0.03, 0.782),
-        (0.046, 0.30, 0.030), 0.010, 3, CANVAS_DARK, root)
-    box("StrapBuckle" + ("L" if side < 0 else "R"), (side * 0.094, -0.168, 0.565),
-        (0.052, 0.016, 0.05), 0.006, 2, BOOT_SOLE, root)
+    tag = "L" if side < 0 else "R"
+    # the straps have to sit proud of the jacket, or they vanish inside it
+    box("Strap" + tag, (side * 0.101, -0.153, 0.598), (0.052, 0.030, 0.305), 0.013, 3, CANVAS_DARK, root,
+        rot=(0.05, 0, 0))
+    box("StrapBuckle" + tag, (side * 0.101, -0.171, 0.545), (0.056, 0.018, 0.052), 0.007, 2, BOOT_SOLE, root)
+    box("StrapTop" + tag, (side * 0.101, 0.035, 0.778), (0.052, 0.305, 0.030), 0.011, 3, CANVAS_DARK, root)
 
-# lantern hanging off the pack
+# lantern on the pack's side, held by a leather loop
 lantern = bpy.data.objects.new("Lantern", None)
 lantern.empty_display_size = 0.05
 bpy.context.collection.objects.link(lantern)
 lantern.parent = root
-lantern.location = (0.185, 0.215, 0.46)
-cyl("LanternTop", (0, 0, 0.048), 0.032, 0.021, 0.032, 14, METAL, lantern)
-cyl("LanternGlass", (0, 0, 0.002), 0.028, 0.028, 0.058, 16, GLOW, lantern)
-cyl("LanternBase", (0, 0, -0.040), 0.030, 0.032, 0.024, 14, METAL, lantern)
-torus("LanternHandle", (0, 0, 0.082), 0.030, 0.005, METAL, lantern, rot=(math.pi / 2, 0, 0), maj=16, minr=6)
-box("LanternStrap", (0, 0.036, 0.108), (0.030, 0.075, 0.016), 0.006, 2, BOOT_SOLE, lantern, rot=(0.12, 0, 0))
-
-# a thumb over the staff, so the hand reads as gripping it
-sphere("ThumbR", (0.232, -0.070, 0.455), 0.028, (1.1, 1.0, 1.3), 14, 10, SKIN, root)
-sphere("ThumbL", (-0.192, -0.024, 0.425), 0.024, (1, 1, 1.3), 14, 10, SKIN, root)
+lantern.location = (0.208, 0.242, 0.442)
+cyl("LanternTop", (0, 0, 0.050), 0.034, 0.022, 0.034, 16, METAL, lantern)
+cyl("LanternGlass", (0, 0, 0.002), 0.030, 0.030, 0.060, 18, GLOW, lantern)
+cyl("LanternBase", (0, 0, -0.042), 0.032, 0.034, 0.026, 16, METAL, lantern)
+torus("LanternHandle", (0, 0, 0.086), 0.032, 0.005, METAL, lantern, rot=(math.pi / 2, 0, 0), maj=18, minr=6)
+box("LanternStrap", (0, 0.038, 0.112), (0.032, 0.080, 0.017), 0.006, 2, BOOT_SOLE, lantern, rot=(0.12, 0, 0))
 
 # ---------------------------------------------------------------- staff
-# Passes through the right hand (0.229, -0.05, 0.44) rather than floating next to it.
-staff_pts = [(0.258, -0.082, 0.004), (0.256, -0.068, 0.24), (0.250, -0.056, 0.44),
-             (0.238, -0.040, 0.70), (0.226, -0.024, 0.86)]
-poly_curve("Staff", staff_pts, 0.016, WOOD, root)
-sphere("StaffKnot", (0.254, -0.062, 0.33), 0.026, (1, 0.9, 1.3), 14, 10, WOOD, root)
-sphere("StaffTop", (0.226, -0.024, 0.868), 0.021, (1, 1, 1), 16, 10, WOOD, root)
+staff_pts = [(0.274, -0.084, 0.004), (0.270, -0.070, 0.220), (0.258, -0.056, 0.430),
+             (0.244, -0.040, 0.620), (0.232, -0.026, 0.800)]
+poly_curve("Staff", staff_pts, 0.017, WOOD, root)
+sphere("StaffKnot", (0.256, -0.062, 0.330), 0.027, (1, 0.9, 1.25), 16, 12, WOOD, root)
+sphere("StaffTop", (0.232, -0.026, 0.806), 0.023, (1, 1, 1), 18, 12, WOOD, root)
 
 # ---------------------------------------------------------------- rig helpers + finish
 
@@ -415,6 +471,20 @@ add_light("Key", (-1.5, -2.0, 2.3), 2.6, 150, "#FFF2DE")
 add_light("Fill", (2.3, -1.5, 1.0), 3.4, 60, "#E8EEFF")
 add_light("Rim", (0.6, 2.3, 1.9), 2.8, 110, "#FFD9A8")
 
+# Freestyle ink: the sheet is a drawn illustration, so the honest comparison has an outline too.
+scene.render.use_freestyle = True
+view_layer = bpy.context.view_layer
+view_layer.use_freestyle = True
+fs = view_layer.freestyle_settings
+fs.crease_angle = math.radians(135)
+if not fs.linesets:
+    fs.linesets.new("Ink")
+ls = fs.linesets[0]
+if ls.linestyle is None:
+    ls.linestyle = bpy.data.linestyles.new("Ink")
+ls.linestyle.color = rgba(INK_COLOR)[:3]
+ls.linestyle.thickness = 1.15
+
 cam_data = bpy.data.cameras.new("Cam")
 cam_data.type = "ORTHO"
 cam_data.ortho_scale = 1.55
@@ -446,17 +516,26 @@ bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
 
 if "--render" in sys.argv:
     views = [
-        ("front", (0.0, -3.4, 0.72), (0, 0, 0.66), 1.42),
-        ("three-quarter", (2.35, -2.45, 1.15), (0, 0, 0.66), 1.42),
-        ("back", (-1.6, 2.9, 1.0), (0, 0, 0.66), 1.42),
-        ("side", (3.3, -0.4, 0.8), (0, 0, 0.66), 1.42),
-        ("closeup-face", (0.0, -2.6, 0.95), (0, 0, 0.95), 0.78),
-        ("closeup-hand", (0.30, -2.5, 0.50), (0.20, -0.03, 0.47), 0.46),
+        ("front", (0.0, -3.4, 0.68), (0, 0, 0.66), 1.40, "ORTHO"),
+        ("three-quarter", (1.55, -2.75, 1.10), (0, 0, 0.66), 1.40, "ORTHO"),
+        ("back", (-1.6, 2.9, 1.0), (0, 0, 0.66), 1.40, "ORTHO"),
+        ("side", (3.3, -0.4, 0.78), (0, 0, 0.66), 1.40, "ORTHO"),
+        ("closeup-face", (0.0, -2.6, 0.95), (0, 0, 0.95), 0.80, "ORTHO"),
+        ("closeup-hand", (0.30, -2.5, 0.50), (0.20, -0.03, 0.47), 0.46, "ORTHO"),
+        ("hero", (1.05, -2.45, 0.95), (0, 0, 0.62), 0.0, "PERSP"),
     ]
-    for name, loc, aim, scale in views:
+    only = os.environ.get("VIEWS")
+    if only:
+        keep = set(only.split(","))
+        views = [v for v in views if v[0] in keep]
+    for name, loc, aim, scale, kind in views:
         cam.location = loc
         target.location = aim
-        cam.data.ortho_scale = scale
+        cam.data.type = kind
+        if kind == "ORTHO":
+            cam.data.ortho_scale = scale
+        else:
+            cam.data.lens = 95
         scene.render.filepath = os.path.join(RENDER_DIR, name + ".png")
         bpy.ops.render.render(write_still=True)
         print("rendered", name)
