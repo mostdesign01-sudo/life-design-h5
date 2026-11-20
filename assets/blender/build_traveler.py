@@ -277,7 +277,7 @@ for side in (-1, 1):
     tag = "L" if side < 0 else "R"
     ex, ez = side * 0.098, -0.040
     sphere("Eye" + tag, (ex, on_face(ex, ez, 0.006), HEAD_Z + ez), 0.037, (1, 0.55, 1.02), 26, 18, INK, root)
-    face_arc("Brow" + tag, side * 0.101, 0.022, 0.038, 218, 322, 0.0070, INK, steps=16)
+    face_arc("Brow" + tag, side * 0.101, 0.024, 0.042, 214, 326, 0.0105, INK, steps=18)
     cx, cz = side * 0.154, -0.090
     sphere("Cheek" + tag, (cx, on_face(cx, cz, 0.004), HEAD_Z + cz), 0.052, (1, 0.20, 0.56), 20, 14, BLUSH, root)
 # flip=True puts the low point in the middle: a smile, not a frown
