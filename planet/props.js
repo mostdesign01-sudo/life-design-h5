@@ -207,6 +207,7 @@ function waterMaterial() {
   const material = new THREE.MeshStandardMaterial({
     color: 0x5cc3dc, roughness: 0.08, metalness: 0.15, emissive: 0x1a6f8a, emissiveIntensity: 0.25
   });
+  material.defines.NO_OUTLINE = "";
   const uBurst = { value: 0 };
   material.userData.uBurst = uBurst;
   patchMaterial(material, "springWater", shader => {
@@ -325,18 +326,22 @@ export function buildSpring(rand) {
     }
   });
 
-  const reedMat = mat(0x6f8f3a);
-  const tipMat = mat(0x7a5232);
-  for (let i = 0; i < 7; i += 1) {
-    const a = 2.2 + i * 0.14;
-    const h = 0.35 + rand() * 0.2;
-    const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, h, 5), reedMat);
-    reed.position.set(Math.cos(a) * 0.82, h / 2, Math.sin(a) * 0.82);
-    reed.rotation.z = (rand() - 0.5) * 0.3;
+  const reedMat = mat(0x639140);
+  reedMat.defines.NO_OUTLINE = "";
+  const tipMat = mat(0x885c3b);
+  tipMat.defines.NO_OUTLINE = "";
+  for (let i = 0; i < 5; i += 1) {
+    const a = 2.25 + i * 0.19;
+    const h = 0.34 + rand() * 0.16;
+    const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.022, h, 7), reedMat);
+    reed.position.set(Math.cos(a) * 0.84, h / 2, Math.sin(a) * 0.84);
+    reed.rotation.z = (rand() - 0.5) * 0.22;
+    reed.userData.noShadow = true;
     group.add(reed);
     if (i % 2 === 0) {
-      const tip = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.06, 4, 6), tipMat);
+      const tip = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.065, 5, 8), tipMat);
       tip.position.set(reed.position.x, h, reed.position.z);
+      tip.userData.noShadow = true;
       group.add(tip);
     }
   }

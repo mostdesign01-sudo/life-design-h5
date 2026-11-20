@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { createPost, softTexture } from "./look.js";
 import {
-  R, Y, Z, SUN, POLE, TERMINATOR, PATH_ANGLE, shared,
+  R, Y, Z, SUN, POLE, TERMINATOR, PATH_ANGLE, shared, patchMaterial,
   dirAt, surfaceRadius, placeOnPlanet, yawToward, rng, randomDir
 } from "./geo.js";
 import { buildSky, buildCloudSea, buildMotes } from "./sky.js";
@@ -156,33 +156,39 @@ export function createWorld(canvas) {
     bushes.push(bush);
   }
 
-  const grass = buildGrass(rand, blockers, { count: mobile ? 5200 : 11000, aprons });
+  const grass = buildGrass(rand, blockers, { count: mobile ? 4800 : 9500, aprons });
   grass.meshes.forEach(mesh => scene.add(mesh));
 
-  const flowerMat = new THREE.MeshStandardMaterial({ roughness: 0.7, side: THREE.DoubleSide });
-  // Flowers grow in drifts, each mostly one colour: scattered singly in five colours they read
-  // as confetti on the lawn.
-  const flowerPalette = [0xffffff, 0xfff1a8, 0xffb7cc, 0xd6c2ff, 0xffd27a].map(c => new THREE.Color(c));
-  const drifts = Array.from({ length: 30 }, (_, i) => {
+  const flowerMat = new THREE.MeshStandardMaterial({ roughness: 0.82, envMapIntensity: 0.22, side: THREE.DoubleSide });
+  flowerMat.defines.TOON_GROUND = "";
+  patchMaterial(flowerMat, "flowerNormal", shader => {
+    shader.fragmentShader = shader.fragmentShader.replace("#include <normal_fragment_begin>", `#include <normal_fragment_begin>
+      normal = normalize(vNormal);`);
+  });
+  // Flowers grow in soft, cohesive drifts without depth outlines so they never speckle the lawn.
+  const flowerPalette = [0xfff6e0, 0xffe99a, 0xffc0d0, 0xd9c8ff, 0xffd082].map(c => new THREE.Color(c));
+  const drifts = Array.from({ length: 24 }, (_, i) => {
     let dir = randomDir(rand);
     if (dir.dot(POLE) < 0 && rand() < 0.75) dir.multiplyScalar(-1);
-    return { dir, spread: 0.05 + rand() * 0.07, colour: i % flowerPalette.length };
+    return { dir, spread: 0.04 + rand() * 0.055, colour: i % flowerPalette.length };
   });
-  const flowers = scatter(rand, 540, blockers, flowerGeometry(), flowerMat, {
-    avoidPath: true, tilt: 0.3, scaleMin: 0.75, scaleMax: 1.15,
+  const flowers = scatter(rand, 400, blockers, flowerGeometry(), flowerMat, {
+    avoidPath: true, tilt: 0.12, scaleMin: 0.85, scaleMax: 1.2,
     near: r => {
       const drift = drifts[Math.floor(r() * drifts.length)];
-      return randomDir(r).multiplyScalar(drift.spread * (0.4 + r())).add(drift.dir).normalize();
+      return randomDir(r).multiplyScalar(drift.spread * (0.35 + r() * 0.85)).add(drift.dir).normalize();
     }
   });
   flowers.dirs.forEach((dir, i) => {
     let best = drifts[0];
     drifts.forEach(drift => { if (drift.dir.dot(dir) > best.dir.dot(dir)) best = drift; });
-    flowers.mesh.setColorAt(i, flowerPalette[rand() < 0.85 ? best.colour : Math.floor(rand() * flowerPalette.length)]);
+    flowers.mesh.setColorAt(i, flowerPalette[rand() < 0.9 ? best.colour : Math.floor(rand() * flowerPalette.length)]);
   });
+  flowers.mesh.receiveShadow = true;
   scene.add(flowers.mesh);
 
-  const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.25 });
+  rockMat.defines.NO_OUTLINE = "";
   const rocks = scatter(rand, 70, blockers, mossyRockGeometry(), rockMat, { scaleMin: 0.5, scaleMax: 1.8, tilt: 0.4 });
   rocks.mesh.castShadow = true;
   rocks.mesh.receiveShadow = true;

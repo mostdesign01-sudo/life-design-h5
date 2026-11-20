@@ -7,10 +7,11 @@ import {
 const GROUND_GLSL = /* glsl */`
   ${NOISE_GLSL}
   vec3 meadowOf(float p) {
-    // Lush, slightly blue-leaning greens: under the warm sun a yellow-green meadow reads as straw.
-    vec3 a = vec3(0.545, 0.765, 0.310);
-    vec3 b = vec3(0.345, 0.620, 0.270);
-    vec3 c = vec3(0.165, 0.440, 0.285);
+    // Soft, unified pastel-lush greens: a tight tonal range reads as a calm, storybook meadow
+    // rather than mottled patches.
+    vec3 a = vec3(0.560, 0.775, 0.340);
+    vec3 b = vec3(0.395, 0.665, 0.315);
+    vec3 c = vec3(0.255, 0.540, 0.330);
     return p < 0.5 ? mix(a, b, p * 2.0) : mix(b, c, (p - 0.5) * 2.0);
   }
   vec3 strawOf(float p) {
@@ -20,11 +21,11 @@ const GROUND_GLSL = /* glsl */`
     return p < 0.5 ? mix(a, b, p * 2.0) : mix(b, c, (p - 0.5) * 2.0);
   }
   float fieldPatch(vec3 d) {
-    float v = sin(d.x * 2.2 + 0.7) * sin(d.y * 2.6 + 2.1) + 0.6 * sin(d.z * 3.4 + d.x * 1.7 + 0.4);
-    return clamp(0.5 + v * 0.45, 0.0, 1.0);
+    float v = sin(d.x * 2.0 + 0.7) * sin(d.y * 2.4 + 2.1) + 0.5 * sin(d.z * 3.0 + d.x * 1.5 + 0.4);
+    return clamp(0.5 + v * 0.4, 0.0, 1.0);
   }
   float fieldDetail(vec3 d) {
-    return 0.5 + 0.5 * sin(d.x * 11.3 + 0.3) * sin(d.y * 9.7 + 1.9) * sin(d.z * 12.1 + 0.8);
+    return 0.5 + 0.5 * sin(d.x * 6.5 + 0.3) * sin(d.y * 6.1 + 1.9) * sin(d.z * 6.9 + 0.8);
   }
   // Chord distance on the unit sphere: cheap and stable near the poles of each apron.
   float chordTo(vec3 d, vec3 c) {
@@ -34,25 +35,24 @@ const GROUND_GLSL = /* glsl */`
     float p = fieldPatch(d);
     float n = fieldDetail(d);
     vec3 col = mix(strawOf(p), meadowOf(p), smoothstep(0.05, 0.6, health));
-    col += (n - 0.5) * 0.035;
-    // Two frequencies: a slow field patch for colour variation, a faint high grain so the
-    // ground never tiles, instead of one mid-frequency band that read as sandpaper.
-    col *= 1.0 + vnoise(d * 5.5) * 0.05 + (vnoise(d * 26.0) - 0.5) * 0.008;
+    col += (n - 0.5) * 0.014;
+    // Keep only a broad, gentle colour drift so the meadow reads velvety instead of grainy.
+    col *= 1.0 + (vnoise(d * 4.0) - 0.5) * 0.045;
 
     float off = abs(acos(clamp(dot(d, vec3(${POLE.x.toFixed(5)}, ${POLE.y.toFixed(5)}, ${POLE.z.toFixed(5)})), -1.0, 1.0)) - ${PATH_ANGLE.toFixed(5)});
-    float edge = 0.026 + (vnoise(d * 40.0) - 0.5) * 0.010;
-    float path = 1.0 - smoothstep(edge, edge + 0.028, off + (n - 0.5) * 0.006);
-    vec3 dirt = vec3(0.851, 0.725, 0.541) * (1.0 + (n - 0.5) * 0.08);
+    float edge = 0.026 + (vnoise(d * 14.0) - 0.5) * 0.008;
+    float path = 1.0 - smoothstep(edge, edge + 0.032, off + (n - 0.5) * 0.004);
+    vec3 dirt = vec3(0.855, 0.735, 0.560) * (1.0 + (n - 0.5) * 0.04);
     col = mix(col, dirt, path);
 
     for (int i = 0; i < 6; i++) {
       float dist = chordTo(d, aprons[i].xyz);
       // Darken toward the prop instead of lightening: a bright disc under every object is what
-      // makes them read as stickers. Dirt patch inside, a soft AO skirt slightly wider.
-      float dirtK = 1.0 - smoothstep(aprons[i].w * 0.4, aprons[i].w, dist);
-      float rough = 0.85 + 0.3 * (vnoise(d * 90.0) - 0.5);
-      col = mix(col, vec3(0.60, 0.51, 0.37) * rough, dirtK * 0.55);
-      col *= 1.0 - 0.20 * (1.0 - smoothstep(0.0, aprons[i].w * 1.15, dist));
+      // makes them read as stickers. Smooth dirt patch inside, soft AO skirt slightly wider.
+      float dirtK = 1.0 - smoothstep(aprons[i].w * 0.35, aprons[i].w, dist);
+      float rough = 0.94 + 0.08 * (vnoise(d * 10.0) - 0.5);
+      col = mix(col, vec3(0.62, 0.53, 0.39) * rough, dirtK * 0.48);
+      col *= 1.0 - 0.16 * (1.0 - smoothstep(0.0, aprons[i].w * 1.15, dist));
     }
     return col;
   }
@@ -139,29 +139,29 @@ export function buildAtmosphere() {
   return { mesh, material };
 }
 
-const TUFT_H = 0.15;
+const TUFT_H = 0.115;
 // The breeze blows one way across the whole planet; every blade leans with it.
 const WIND = new THREE.Vector3(0.82, 0.1, -0.56).normalize();
 
-// A patch of lawn rather than a weed: broad soft blades scattered over a small disc, all leaning
-// downwind (local +Z) and close to one height, so neighbouring patches knit into a single carpet.
+// A soft velvet tuft rather than spiky needles: fewer, broader blades leaning gently downwind so
+// neighbouring tufts blend into one calm carpet instead of breaking up into pixel-wide stripes.
 function tuftGeometry() {
-  const blades = 10;
+  const blades = 6;
   const segs = 2;
   const positions = [];
   const normals = [];
   const uvs = [];
   const rand = (() => { let s = 7; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; })();
   for (let b = 0; b < blades; b += 1) {
-    const ba = (b / blades) * Math.PI * 2 + rand() * 0.6;
-    const br = 0.035 + 0.075 * Math.sqrt(rand());
+    const ba = (b / blades) * Math.PI * 2 + rand() * 0.45;
+    const br = 0.03 + 0.065 * Math.sqrt(rand());
     const bx = Math.cos(ba) * br;
     const bz = Math.sin(ba) * br;
     const face = rand() * Math.PI;
-    const lean = 0.035 + rand() * 0.02;
-    const h = TUFT_H * (0.82 + rand() * 0.18);
-    const w = 0.03;
-    const width = t => w * (1 - t * t * 0.8);
+    const lean = 0.03 + rand() * 0.015;
+    const h = TUFT_H * (0.86 + rand() * 0.14);
+    const w = 0.044;
+    const width = t => w * (1 - t * t * 0.72);
     for (let s = 0; s < segs; s += 1) {
       const t0 = s / segs;
       const t1 = (s + 1) / segs;
@@ -194,7 +194,7 @@ function tuftGeometry() {
 
 function grassMaterial() {
   const material = new THREE.MeshStandardMaterial({
-    roughness: 0.92,
+    roughness: 0.94,
     metalness: 0,
     envMapIntensity: 0.18,
     side: THREE.DoubleSide,
@@ -221,11 +221,11 @@ function grassMaterial() {
         vec3 windDir = vec3(${WIND.x.toFixed(4)}, ${WIND.y.toFixed(4)}, ${WIND.z.toFixed(4)});
         float along = dot(ip, windDir);
         float cross = dot(ip, vec3(0.31, 0.62, 0.72));
-        float wave = 0.5 + 0.5 * sin(along * 1.25 - uTime * 1.5 + 1.1 * sin(cross * 0.8 + uTime * 0.25));
+        float wave = 0.5 + 0.5 * sin(along * 1.15 - uTime * 1.4 + 1.0 * sin(cross * 0.75 + uTime * 0.25));
         wave = wave * wave * (3.0 - 2.0 * wave);
         vWave = wave;
-        transformed.z += (0.012 + 0.06 * wave) * vH * vH;
-        transformed.y -= 0.022 * wave * vH * vH;`)
+        transformed.z += (0.01 + 0.055 * wave) * vH * vH;
+        transformed.y -= 0.018 * wave * vH * vH;`)
       // A blade is shadowed where it stands, not where its tip happens to reach: sampled per
       // vertex, a tree's shadow on the lawn broke up into a litter of lit tips and dark roots.
       .replace("#include <shadowmap_vertex>", `
@@ -237,16 +237,16 @@ function grassMaterial() {
       .replace("#include <common>", `#include <common>\nuniform float uHealth;\nuniform vec3 uHaze;\nuniform vec4 uAprons[6];\nvarying float vH;\nvarying float vWave;\nvarying vec3 vPlanetDir;\n${GROUND_GLSL}`)
       .replace("#include <color_fragment>", `#include <color_fragment>
         vec3 g = groundColour(normalize(vPlanetDir), uHealth, uAprons);
-        // Roots match the ground exactly, so there is no dark stubble between blades; tips warm
-        // toward a sunlit yellow-green, and the passing wind front lifts them a little further.
-        vec3 tip = g * vec3(1.12, 1.11, 0.95) + vec3(0.012, 0.025, 0.0);
-        diffuseColor.rgb = mix(g, tip, vH * (0.4 + 0.6 * vWave));`)
+        // Almost seamless with the ground in the troughs, lifting softly in warm sunlight where
+        // the breeze rolls past; fade tip contrast with distance so far blades never fizz.
+        vec3 tip = g * vec3(1.10, 1.09, 0.94) + vec3(0.012, 0.022, 0.0);
+        float distFade = 1.0 - smoothstep(5.5, 13.5, length(vViewPosition));
+        diffuseColor.rgb = mix(g, tip, vH * (0.16 + 0.84 * vWave) * distFade);`)
       // Blades are two-sided, and the renderer flips the normal on a back face: half the lawn was
       // being lit as if it faced the ground. Both sides take the ground's normal.
       .replace("#include <normal_fragment_begin>", `#include <normal_fragment_begin>
         normal = normalize(vNormal);`);
   });
-  seeThrough(material);
   return material;
 }
 
@@ -296,9 +296,9 @@ export function buildGrass(rand, blockers, { count, aprons }) {
       if (d.dot(center) < 0.55) continue;
       if (blockers.some(b => d.angleTo(b.dir) < b.radius + 0.04)) continue;
       if (Math.abs(d.angleTo(POLE) - PATH_ANGLE) < 0.05) continue;
-      const s = 0.88 + rand() * 0.3;
+      const s = 0.9 + rand() * 0.25;
       q.setFromUnitVectors(Y, d);
-      q2.setFromEuler(e.set((rand() - 0.5) * 0.08, yawToward(d, WIND) + (rand() - 0.5) * 0.7, (rand() - 0.5) * 0.08));
+      q2.setFromEuler(e.set((rand() - 0.5) * 0.015, yawToward(d, WIND) + (rand() - 0.5) * 0.55, (rand() - 0.5) * 0.015));
       q.multiply(q2);
       m.compose(d.clone().multiplyScalar(surfaceRadius(d)), q, new THREE.Vector3(s, s, s));
       mesh.setMatrixAt(placed, m);
@@ -350,15 +350,15 @@ export function scatter(rand, count, blockers, geometry, material, {
 }
 
 export function flowerGeometry() {
-  const geo = new THREE.CircleGeometry(0.055, 20);
+  const geo = new THREE.CircleGeometry(0.06, 20);
   const pos = geo.attributes.position;
   for (let i = 1; i < pos.count; i += 1) {
     const a = Math.atan2(pos.getY(i), pos.getX(i));
-    const r = 0.055 * (0.55 + 0.45 * Math.abs(Math.cos(a * 2.5)));
+    const r = 0.06 * (0.62 + 0.38 * Math.abs(Math.cos(a * 2.5)));
     pos.setXY(i, Math.cos(a) * r, Math.sin(a) * r);
   }
   geo.rotateX(-Math.PI / 2);
-  geo.translate(0, 0.12, 0);
+  geo.translate(0, 0.095, 0);
   return geo;
 }
 

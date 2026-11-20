@@ -39,10 +39,10 @@ import * as THREE from "three";
 `;
 }
 
-// Terrain and grass write alpha 0 into the (opaque) frame: the finishing pass reads it as "do not
-// ink an outline around this" (see inkLine in look.js).
+// Terrain, grass, and tiny ground scatter write alpha 0 into the (opaque) frame: the finishing pass
+// reads it as "do not ink an outline around this" (see inkLine in look.js).
 THREE.ShaderChunk.opaque_fragment += `
-#ifdef TOON_GROUND
+#if defined( TOON_GROUND ) || defined( NO_OUTLINE )
 	gl_FragColor.a = 0.0;
 #endif
 `;

@@ -117,8 +117,8 @@ const FinishShader = {
       c *= mix(vec3(0.87, 0.89, 1.12), vec3(1.07, 1.0, 0.88), t);
       vec2 d = vUv - 0.5;
       c *= 1.0 - dot(d, d) * uVignette;
-      // Static low-frequency grain reads as paper; the old per-frame hash read as video noise.
-      c += (hash(vUv * 420.0) - 0.5) * 0.0055;
+      // Static low-frequency grain reads as paper; keep it whisper-light so broad meadows stay smooth.
+      c += (hash(vUv * 420.0) - 0.5) * 0.0028;
       gl_FragColor = vec4(max(c, 0.0), 1.0);
       gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
       gl_FragColor = sRGBTransferOETF(gl_FragColor);
