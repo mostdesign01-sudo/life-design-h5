@@ -18,7 +18,10 @@ export { R, SUN, POLE, surfaceRadius, buildTraveler };
 const SOFT = softTexture();
 
 export function createWorld(canvas) {
-  const mobile = window.innerWidth < 700 || matchMedia("(pointer: coarse)").matches;
+  // A touch laptop still has a big screen and a real GPU; treat it as a phone only when the
+  // viewport is actually phone-sized.
+  const touchOnly = (navigator.maxTouchPoints || 0) > 0 && !matchMedia("(hover: hover)").matches;
+  const mobile = window.innerWidth < 700 || touchOnly;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
   let pixelRatio = Math.min(window.devicePixelRatio || 1, mobile ? 1.75 : 2);
   let resolutionScale = 1;
@@ -494,9 +497,12 @@ export function createWorld(canvas) {
     tiltShift = level >= 2;
     post.setTiltShift(tiltShift);
     post.setBloom(level >= 1);
-    post.setSamples(level >= 1 ? 4 : 0);
-    if (level < 2) pixelRatio = Math.min(pixelRatio, mobile ? 1.25 : 1.75);
-    if (level < 1) pixelRatio = Math.min(pixelRatio, mobile ? 1 : 1.5);
+    // Two samples even on the slowest tier: without any multisampling every silhouette turns into
+    // a staircase, which reads as a low-resolution picture rather than a cheap effect.
+    post.setSamples(level >= 1 ? 4 : 2);
+    // On a desktop screen the pixel ratio *is* the resolution, and trading it away is what makes
+    // the frame look blurry; phones are the only place that trade is worth it.
+    if (mobile) pixelRatio = level >= 2 ? pixelRatio : level >= 1 ? Math.min(pixelRatio, 1.25) : 1;
     grass.setCount(level >= 2 ? 1 : level >= 1 ? 0.7 : 0.45);
     setSize(window.innerWidth, window.innerHeight);
   }
@@ -505,20 +511,22 @@ export function createWorld(canvas) {
   const failedScales = new Set();
   let frameBudget = 0;
   function setResolutionScale(scale) {
-    const next = THREE.MathUtils.clamp(scale, 0.55, 1);
+    // A desktop frame never renders below native: a soft picture is worse than a dropped effect.
+    // Phones can trade resolution, but never to the point where the picture stops reading.
+    const next = THREE.MathUtils.clamp(scale, mobile ? 0.7 : 1, 1);
     if (Math.abs(next - resolutionScale) < 0.02) return;
     resolutionScale = next;
     setSize(window.innerWidth, window.innerHeight);
   }
   function noteFrameTime(ms) {
-    if (qualityLevel < 1) return;
+    if (qualityLevel < 1 || !mobile) return;
     frameBudget = frameBudget * 0.85 + ms * 0.15;
     if (frameBudget > 22) {
       failedScales.add(Math.round(resolutionScale * 20) / 20);
       setResolutionScale(resolutionScale * 0.85);
       frameBudget = 16;
-    } else if (frameBudget < 12) {
-      const up = Math.min(1, resolutionScale * 1.05);
+    } else if (frameBudget < 13) {
+      const up = Math.min(1, resolutionScale * 1.08);
       if (!failedScales.has(Math.round(up * 20) / 20)) setResolutionScale(up);
     }
   }
