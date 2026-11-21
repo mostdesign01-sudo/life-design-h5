@@ -129,7 +129,11 @@ export const shared = {
   // xy: centre in render-target pixels, z: radius in pixels (0 = off), w: view-space depth of the traveler.
   uHole: { value: new THREE.Vector4(0, 0, 0, 0) },
   // Where the traveler stands, so the grass can part around their feet.
-  uFeet: { value: new THREE.Vector3(0, 100, 0) }
+  uFeet: { value: new THREE.Vector3(0, 100, 0) },
+  // Bench stop only: a short mist shelf at the limb. 0 everywhere else.
+  uBenchHaze: { value: 0 },
+  // Silhouette of the planet from the camera, as a dot with normalize(cameraPosition).
+  uLimb: { value: 0.45 }
 };
 
 export const NOISE_GLSL = /* glsl */`

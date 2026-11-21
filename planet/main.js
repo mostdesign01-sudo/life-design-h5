@@ -1164,7 +1164,10 @@ function updateCamera(dt, time) {
   }
   // A director (used by the promo renderer) may take over the framing; it gets the same smoothing.
   if (cam.director) cam.director(desired, time);
-  const rate = cam.directorRate ?? (diveT < 1.6 ? 2.6 : cam.mode === "follow" ? 7 : 3);
+  const baseRate = cam.directorRate ?? (diveT < 1.6 ? 2.6 : cam.mode === "follow" ? 7 : 3);
+  // The bench handoff eases for about two seconds, both ways. Other stops keep their pace.
+  const handingBench = !cam.director && ((cam.mode === "focus" && cam.focusId === "bench") || benchGaze > 0.03);
+  const rate = handingBench ? 1.35 : baseRate;
   const k = 1 - Math.exp(-dt * rate);
   cam.dir.lerp(desired.dir, k).normalize();
   cam.look.lerp(desired.look, k);
@@ -1479,8 +1482,26 @@ function handleTap(clientX, clientY) {
 
 const pointers = new Map();
 let joystickId = null;
+let stickCandidate = null;
 let joystickOrigin = { x: 0, y: 0 };
 let pinchStart = null;
+const STICK_SLOP = 10;
+
+function stickZone(event) {
+  return event.pointerType !== "mouse"
+    && cam.mode === "follow"
+    && event.clientX < window.innerWidth * 0.45
+    && event.clientY > window.innerHeight * 0.3;
+}
+
+function hideStick() {
+  joystickId = null;
+  stickCandidate = null;
+  input.x = 0;
+  input.y = 0;
+  els.joystick.style.display = "none";
+  els.joystickKnob.style.transform = "translate(0, 0)";
+}
 
 els.canvas.addEventListener("pointerdown", event => {
   try {
@@ -1488,18 +1509,15 @@ els.canvas.addEventListener("pointerdown", event => {
   } catch (error) {
     // Synthetic or already-released pointers can't be captured; dragging still works without it.
   }
-  const isTouch = event.pointerType !== "mouse";
   const p = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: performance.now(), moved: 0 };
   pointers.set(event.pointerId, p);
-  if (isTouch && joystickId === null && cam.mode === "follow" && event.clientX < window.innerWidth * 0.45 && event.clientY > window.innerHeight * 0.3) {
-    joystickId = event.pointerId;
+  // Claim the corner, but don't walk yet: a tap that barely moves still has to open a label.
+  if (joystickId === null && stickCandidate === null && stickZone(event)) {
+    stickCandidate = event.pointerId;
     joystickOrigin = { x: event.clientX, y: event.clientY };
-    els.joystick.style.display = "block";
-    els.joystick.style.left = `${event.clientX}px`;
-    els.joystick.style.top = `${event.clientY}px`;
-    els.joystickKnob.style.transform = "translate(0, 0)";
   }
-  const touches = [...pointers.entries()].filter(([id]) => id !== joystickId);
+  const held = new Set([joystickId, stickCandidate]);
+  const touches = [...pointers.entries()].filter(([id]) => !held.has(id));
   if (touches.length === 2) {
     const [a, b] = touches.map(([, value]) => value);
     pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: cam.zoom, orbitScale: orbit.scale };
@@ -1514,21 +1532,30 @@ els.canvas.addEventListener("pointermove", event => {
   p.x = event.clientX;
   p.y = event.clientY;
   p.moved = Math.max(p.moved, Math.hypot(event.clientX - p.startX, event.clientY - p.startY));
+  if (event.pointerId === stickCandidate && p.moved < STICK_SLOP) return;
+  if (event.pointerId === stickCandidate) {
+    joystickId = stickCandidate;
+    stickCandidate = null;
+    els.joystick.style.display = "block";
+    els.joystick.style.left = `${joystickOrigin.x}px`;
+    els.joystick.style.top = `${joystickOrigin.y}px`;
+  }
   if (event.pointerId === joystickId) {
     const max = 50;
     let jx = event.clientX - joystickOrigin.x;
     let jy = event.clientY - joystickOrigin.y;
     const len = Math.hypot(jx, jy);
-    if (len > max) {
-      jx = (jx / len) * max;
-      jy = (jy / len) * max;
-    }
-    els.joystickKnob.style.transform = `translate(${jx}px, ${jy}px)`;
-    input.x = jx / max;
-    input.y = -jy / max;
+    const clamped = Math.min(len, max);
+    const ux = len > 0 ? jx / len : 0;
+    const uy = len > 0 ? jy / len : 0;
+    els.joystickKnob.style.transform = `translate(${ux * clamped}px, ${uy * clamped}px)`;
+    const mag = len <= STICK_SLOP ? 0 : (clamped - STICK_SLOP) / (max - STICK_SLOP);
+    input.x = ux * mag;
+    input.y = -uy * mag;
     return;
   }
-  const others = [...pointers.entries()].filter(([id]) => id !== joystickId);
+  const held = new Set([joystickId, stickCandidate]);
+  const others = [...pointers.entries()].filter(([id]) => !held.has(id));
   if (others.length === 2 && pinchStart) {
     const [a, b] = others.map(([, value]) => value);
     const ratio = pinchStart.dist / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y));
@@ -1547,14 +1574,12 @@ function endPointer(event) {
   const p = pointers.get(event.pointerId);
   pointers.delete(event.pointerId);
   if (event.pointerId === joystickId) {
-    joystickId = null;
-    input.x = 0;
-    input.y = 0;
-    els.joystick.style.display = "none";
+    hideStick();
     return;
   }
+  if (event.pointerId === stickCandidate) stickCandidate = null;
   if (pointers.size < 2) pinchStart = null;
-  if (p && event.type === "pointerup" && p.moved < 10 && performance.now() - p.time < 400 && !sheetState) {
+  if (p && event.type === "pointerup" && p.moved < STICK_SLOP && performance.now() - p.time < 400 && !sheetState) {
     handleTap(event.clientX, event.clientY);
   }
 }
@@ -1642,6 +1667,19 @@ function measure(dt, time) {
 const warmup = { done: false, at: 0 };
 
 const focusPoint = new THREE.Vector3();
+let benchGaze = 0;
+let benchGazeAt = performance.now();
+
+function updateBenchGaze() {
+  const now = performance.now();
+  // Wall time, capped, so a long frame still eases instead of freezing the handoff.
+  const dt = Math.min(0.2, Math.max(0, (now - benchGazeAt) / 1000));
+  benchGazeAt = now;
+  const want = cam.mode === "focus" && cam.focusId === "bench" ? 1 : 0;
+  benchGaze += (want - benchGaze) * (1 - Math.exp(-Math.max(dt, 0.001) * 1.35));
+  if (Math.abs(want - benchGaze) < 0.001) benchGaze = want;
+  world.setBenchGaze(benchGaze);
+}
 
 // Keep the tilt-shift band on whatever the camera is about: the traveler, the open object, or the planet.
 function updateFocus() {
@@ -1676,6 +1714,7 @@ function frame() {
   measure(rawDt, time);
   if (pinnedQuality === null) world.noteFrameTime?.(warmup.done ? rawDt * 1000 : 0);
   clockNow = time;
+  updateBenchGaze();
   world.update(dt, time);
   sound.tick(Number(life.answers.dashboard.play ?? 5) / 10);
   updatePlayer(dt, time);

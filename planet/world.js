@@ -230,6 +230,10 @@ export function createWorld(canvas) {
   const post = createPost(renderer, scene, shared.uHole);
   let tiltShift = true;
   let qualityLevel = 2;
+  let benchGaze = 0;
+  function setBenchGaze(value) {
+    benchGaze = THREE.MathUtils.clamp(value, 0, 1);
+  }
 
   const current = { health: 0.5, work: 0.5, play: 0.5, love: 0.5, gravity: 0, designable: 0, problem: 0 };
   const target = { ...current };
@@ -239,6 +243,7 @@ export function createWorld(canvas) {
   const smokeDark = new THREE.Color(0x3b3742);
   const smokeLight = new THREE.Color(0xfff6f0);
   const fogTint = new THREE.Color(0xf3e3d6);
+  const benchWarm = new THREE.Color(0xffd2a8);
   const cloudVivid = new THREE.Color(0xffffff);
   const cloudDull = new THREE.Color(0xb8bcc9);
   const bulbOn = new THREE.Color(0xffc861);
@@ -435,11 +440,15 @@ export function createWorld(canvas) {
     if (envPlay < 0 || (Math.abs(play - envPlay) > 0.04 && time - envAt > 400)) bakeEnv(play, time);
     shared.uHaze.value.copy(mood.skyLight).lerp(fogTint, 0.35);
     shared.uSunTint.value.copy(mood.light);
+    const gaze = benchGaze;
+    shared.uBenchHaze.value = gaze;
+    shared.uLimb.value = R / Math.max(camera.position.length(), R + 0.25);
     hemi.color.copy(mood.skyLight);
     hemi.groundColor.copy(mood.groundLight);
-    hemi.intensity = mood.ambient;
-    sun.color.copy(mood.light);
-    sun.intensity = mood.lightPower;
+    hemi.intensity = mood.ambient * (1 + 0.18 * gaze);
+    sun.color.copy(mood.light).lerp(benchWarm, 0.2 * gaze);
+    sun.intensity = mood.lightPower * (1 - 0.16 * gaze);
+    fill.intensity = 0.28 + 0.2 * gaze;
     scene.fog.color.copy(shared.uHaze.value);
     clouds.materials.forEach(m => m.color.copy(cloudDull).lerp(cloudVivid, mood.vivid));
     atmosphere.material.uniforms.uStrength.value = 0.16 + mood.vivid * 0.12;
@@ -564,7 +573,7 @@ export function createWorld(canvas) {
   return {
     renderer, scene, camera, sky, clouds: clouds.group, trees: trees.map(t => t.group), bushes, objects, farPlanets, blockers,
     setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust, celebrate, setDiaryReady, setNearCull,
-    setFocus: post.setFocus, setSeeThrough, noteFrameTime, get resolutionScale() { return resolutionScale; },
+    setFocus: post.setFocus, setSeeThrough, noteFrameTime, setBenchGaze, get benchGaze() { return benchGaze; }, get resolutionScale() { return resolutionScale; },
     get quality() { return qualityLevel; }
   };
 }

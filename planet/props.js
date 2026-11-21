@@ -25,7 +25,7 @@ export function shadow(obj) {
 const BLOB = blobTexture();
 const SOFT = softTexture();
 
-export function addBlob(group, radius, opacity = 0.45) {
+export function addBlob(group, radius, opacity = 0.45, color = 0x1d2440) {
   // Hug the sphere: on a planet of radius R a flat tangent disk floats r²/2R above the ground at
   // its edge, so droop the disk to follow the curvature before rotating it into place.
   const geo = new THREE.CircleGeometry(radius, 40);
@@ -40,7 +40,7 @@ export function addBlob(group, radius, opacity = 0.45) {
   const blob = new THREE.Mesh(
     geo,
     new THREE.MeshBasicMaterial({
-      map: BLOB, transparent: true, opacity, depthWrite: false, color: 0x1d2440,
+      map: BLOB, transparent: true, opacity, depthWrite: false, color,
       polygonOffset: true, polygonOffsetFactor: -2
     })
   );
@@ -613,7 +613,8 @@ export function buildBench() {
     add(new RoundedBoxGeometry(0.045, 0.3, 0.3, 2, 0.015), iron, x, 0.15, 0.02);
     add(new RoundedBoxGeometry(0.045, 0.36, 0.045, 2, 0.015), iron, x, 0.47, -0.16, -0.18);
   });
-  addBlob(group, 0.6, 0.4);
+  // Darker and a little wider than the other stops, so the legs read as sitting in the ground.
+  addBlob(group, 0.86, 0.82, 0x1c140e);
   shadow(group);
   mergeStatic(group);
   return { group };

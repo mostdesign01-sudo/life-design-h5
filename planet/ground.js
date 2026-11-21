@@ -75,18 +75,23 @@ export function buildPlanet(aprons) {
   patchMaterial(material, "ground", shader => {
     shader.uniforms.uHealth = shared.uHealth;
     shader.uniforms.uHaze = shared.uHaze;
+    shader.uniforms.uBenchHaze = shared.uBenchHaze;
+    shader.uniforms.uLimb = shared.uLimb;
     shader.uniforms.uAprons = uAprons;
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", `#include <common>\nvarying vec3 vPlanetDir;`)
       .replace("#include <begin_vertex>", `#include <begin_vertex>\nvPlanetDir = normalize(position);`);
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\nuniform float uHealth;\nuniform vec3 uHaze;\nuniform vec4 uAprons[6];\nvarying vec3 vPlanetDir;\n${GROUND_GLSL}`)
+      .replace("#include <common>", `#include <common>\nuniform float uHealth;\nuniform vec3 uHaze;\nuniform float uBenchHaze;\nuniform float uLimb;\nuniform vec4 uAprons[6];\nvarying vec3 vPlanetDir;\n${GROUND_GLSL}`)
       .replace("#include <color_fragment>", `#include <color_fragment>
         vec3 g = groundColour(normalize(vPlanetDir), uHealth, uAprons);
         diffuseColor.rgb *= g;`)
       .replace("#include <opaque_fragment>", `#include <opaque_fragment>
         float haze = smoothstep(0.35, 0.98, 1.0 - max(dot(normalize(vPlanetDir), vec3(0.0, 1.0, 0.0)) * 0.5 + 0.5, 0.0));
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, uHaze, haze * 0.05);`);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, uHaze, haze * 0.05);
+        float facing = dot(normalize(vPlanetDir), normalize(cameraPosition));
+        float shelf = smoothstep(uLimb + 0.16, uLimb + 0.02, facing);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, uHaze, shelf * uBenchHaze * 0.7);`);
   });
 
   const mesh = new THREE.Mesh(geometry, material);
@@ -101,7 +106,8 @@ export function buildAtmosphere() {
       uHaze: shared.uHaze,
       uSunTint: shared.uSunTint,
       uSunDir: { value: SUN.clone() },
-      uStrength: { value: 1 }
+      uStrength: { value: 1 },
+      uBenchHaze: shared.uBenchHaze
     },
     side: THREE.BackSide,
     transparent: true,
@@ -121,6 +127,7 @@ export function buildAtmosphere() {
     fragmentShader: /* glsl */`
       uniform vec3 uHaze, uSunTint, uSunDir;
       uniform float uStrength;
+      uniform float uBenchHaze;
       varying vec3 vNormal;
       varying vec3 vWorld;
       void main() {
@@ -129,7 +136,8 @@ export function buildAtmosphere() {
         float fres = pow(clamp(-dot(N, V) / 0.531, 0.0, 1.0), 2.5);
         float sunSide = 0.55 + 0.45 * max(dot(normalize(vWorld), uSunDir), 0.0);
         vec3 tint = mix(uHaze, uSunTint, 0.35 * sunSide);
-        gl_FragColor = vec4(tint * fres * uStrength * 0.85, fres * uStrength);
+        float lip = smoothstep(0.48, 0.82, fres) * uBenchHaze;
+        gl_FragColor = vec4(tint * fres * uStrength * 0.85 + tint * lip * 0.28, fres * uStrength + lip * 0.16);
       }
     `
   });
@@ -205,6 +213,8 @@ function grassMaterial() {
     shader.uniforms.uTime = shared.uTime;
     shader.uniforms.uHealth = shared.uHealth;
     shader.uniforms.uHaze = shared.uHaze;
+    shader.uniforms.uBenchHaze = shared.uBenchHaze;
+    shader.uniforms.uLimb = shared.uLimb;
     shader.uniforms.uAprons = { value: shared._aprons || [] };
     // Bind the same apron array the planet uses (filled by createWorld).
     shader.vertexShader = shader.vertexShader
@@ -234,7 +244,7 @@ function grassMaterial() {
         #endif
         #include <shadowmap_vertex>`);
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\nuniform float uHealth;\nuniform vec3 uHaze;\nuniform vec4 uAprons[6];\nvarying float vH;\nvarying float vWave;\nvarying vec3 vPlanetDir;\n${GROUND_GLSL}`)
+      .replace("#include <common>", `#include <common>\nuniform float uHealth;\nuniform vec3 uHaze;\nuniform float uBenchHaze;\nuniform float uLimb;\nuniform vec4 uAprons[6];\nvarying float vH;\nvarying float vWave;\nvarying vec3 vPlanetDir;\n${GROUND_GLSL}`)
       .replace("#include <color_fragment>", `#include <color_fragment>
         vec3 g = groundColour(normalize(vPlanetDir), uHealth, uAprons);
         // Almost seamless with the ground in the troughs, lifting softly in warm sunlight where
@@ -252,6 +262,10 @@ function grassMaterial() {
         float tuftTone = vnoise(normalize(vPlanetDir) * 9.0);
         diffuseColor.rgb *= 0.975 + 0.05 * tuftTone;
         diffuseColor.rgb = mix(rootC * (0.975 + 0.05 * tuftTone), tipC * (0.975 + 0.05 * tuftTone), vH * (0.5 + 0.4 * vWave) * distFade);`)
+      .replace("#include <opaque_fragment>", `#include <opaque_fragment>
+        float facing = dot(normalize(vPlanetDir), normalize(cameraPosition));
+        float shelf = smoothstep(uLimb + 0.16, uLimb + 0.02, facing);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, uHaze, shelf * uBenchHaze * 0.62);`)
       // Blades are two-sided, and the renderer flips the normal on a back face: half the lawn was
       // being lit as if it faced the ground. Both sides take the ground's normal.
       .replace("#include <normal_fragment_begin>", `#include <normal_fragment_begin>
