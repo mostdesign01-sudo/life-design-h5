@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { createWorld, buildTraveler, surfaceRadius, POLE, SUN, R } from "./world.js";
+import { TRAVELER_DROP } from "./props.js";
 import {
   loadLifeState, saveLifeState, loadPlanetState, savePlanetState,
   markCompleted, classifyProblem, requestCoreProblemCoach, dashboardItems, hasRiskSignal, SUPPORT_TEXT
@@ -97,10 +98,23 @@ const els = {
 let life = loadLifeState();
 const planet = loadPlanetState();
 
-const world = createWorld(els.canvas);
+let world;
+try {
+  world = createWorld(els.canvas);
+} catch (error) {
+  console.error(error);
+  els.loading.innerHTML = '<p>这颗星球在你的设备上没能点亮。</p><p><a href="./index.html" style="color:#fff">先去完整问卷</a></p>';
+  throw error;
+}
 const { scene, camera, objects, farPlanets } = world;
 const traveler = buildTraveler();
 scene.add(traveler.group);
+els.canvas.addEventListener("webglcontextlost", event => {
+  event.preventDefault();
+  els.loading.classList.remove("is-hidden");
+  els.loading.innerHTML = '<p>画面中断了。</p><button class="btn btn-primary" type="button" id="reloadPlanet">点一下重新点亮</button>';
+  document.getElementById("reloadPlanet")?.addEventListener("click", () => location.reload());
+});
 const sound = createSound();
 // Start fetching the display face early; the postcard canvas draws with it.
 document.fonts?.load('600 32px "Planet Serif"');
@@ -148,7 +162,9 @@ const cam = {
 };
 // Intro and overview: an isometric-style view of the whole planet.
 const orbit = {
-  yaw: Math.atan2(POLE.x, POLE.z) - 0.5,
+  // Face the sun side: the visual sun disc hangs just above the limb, and the intro looks
+  // toward it instead of away (the old yaw put the sun behind the camera, out of frame forever).
+  yaw: Math.atan2(SUN.x, SUN.z) + Math.PI,
   pitch: 0.5,
   scale: 1
 };
@@ -180,9 +196,9 @@ function applyView(cameraToSet, aspect) {
 orbitDirection(cam.dir);
 // Intro framing: the planet sits in the upper part of the screen, clear of the title block below.
 const PORTRAIT = window.innerWidth < window.innerHeight;
-const INTRO_LOOK_Y = PORTRAIT ? -6 : -4.2;
+const INTRO_LOOK_Y = PORTRAIT ? -4.4 : -3.1;
 function introView() {
-  return PORTRAIT ? viewHeightFor(22, 17) : 26;
+  return PORTRAIT ? viewHeightFor(16.2, 12.5) : 19.1;
 }
 // Start exactly on the intro framing so the very first frame is already a finished picture.
 cam.look.set(0, INTRO_LOOK_Y, 0);
@@ -238,8 +254,9 @@ function renderQuests() {
     </li>
   `).join("");
   const next = nextQuest();
-  const diaryReady = SCORE_IDS.every(isDone);
-  world.setDiaryReady(diaryReady);
+  const diaryWritten = isDone("sign");
+  const diaryReady = diaryPrerequisites().length === 0;
+  world.setDiaryReady(diaryReady, diaryWritten);
   labelEls.forEach(label => {
     label.el.classList.toggle("is-done", !label.far && isDone(label.id));
     label.el.classList.toggle("is-next", !label.far && label.id === next?.id);
@@ -308,10 +325,48 @@ function standSpot(obj) {
   return obj.dir.clone().multiplyScalar(Math.cos(dist)).addScaledVector(t, Math.sin(dist)).normalize();
 }
 
+function seatOnBench() {
+  const bench = objects.bench.parts[0];
+  bench.updateMatrixWorld(true);
+  // Hips sit on the plank: the group origin is at the feet, and the legs are shorter than the plank is high.
+  const seat = new THREE.Vector3(0, -0.06 + (traveler.drop ?? TRAVELER_DROP), 0.07);
+  bench.localToWorld(seat);
+  traveler.group.position.copy(seat);
+  traveler.group.quaternion.copy(bench.quaternion);
+  traveler.legs.forEach((leg, i) => { leg.rotation.x = -1.45; leg.rotation.z = (i ? -1 : 1) * 0.06; });
+  traveler.arms.forEach((arm, i) => { arm.rotation.x = -0.55; arm.rotation.z = (i ? 1 : -1) * 0.12; });
+  traveler.body.position.y = 0;
+  traveler.body.scale.set(1, 1, 1);
+  traveler.head.rotation.set(-0.08, 0, 0);
+  player.sitting = true;
+  player.dir.copy(objects.bench.dir);
+}
+
+function standFromBench() {
+  if (!player.sitting) return;
+  player.sitting = false;
+  traveler.legs.forEach(leg => { leg.rotation.z = 0; });
+  traveler.arms.forEach(arm => { arm.rotation.z = 0; });
+  const front = new THREE.Vector3(0, 0, 1).applyQuaternion(objects.bench.parts[0].quaternion);
+  const od = objects.bench.dir;
+  const away = front.sub(od.clone().multiplyScalar(front.dot(od))).normalize();
+  const dist = objects.bench.reach + 0.08;
+  player.dir.copy(od).multiplyScalar(Math.cos(dist)).addScaledVector(away, Math.sin(dist)).normalize();
+  player.facing.copy(tangentToward(player.dir, od));
+  camForward.copy(player.facing);
+}
+
 function openSheet(state, html) {
   sheetState = state;
-  player.standTarget = standSpot(objects[state.focusId]);
-  player.standTime = 2.5;
+  player.sitting = false;
+  if (state.focusId === "bench") {
+    player.standTarget = null;
+    player.standTime = 0;
+    seatOnBench();
+  } else {
+    player.standTarget = standSpot(objects[state.focusId]);
+    player.standTime = 2.5;
+  }
   player.lookTarget = objects[state.focusId]?.dir || null;
   els.sheetBody.innerHTML = html;
   if (!els.sheet.classList.contains("is-open")) sound.open();
@@ -332,6 +387,7 @@ function closeSheet() {
   els.sheet.classList.remove("is-open");
   els.sheetBackdrop.classList.remove("is-open");
   if (cam.mode === "focus") cam.mode = "follow";
+  if (state.focusId === "bench") standFromBench();
   if (state.onClose) state.onClose();
 }
 
@@ -474,7 +530,7 @@ function supportFor(coach) {
 function coachHTML(coach) {
   if (!coach) return "";
   if (coach.status === "loading") {
-    return `<div class="coach"><span class="coach-label">AI 关键追问</span><p>AI 正在做一次短判断：一个关键观察、一个追问和一个低成本原型动作。</p></div>`;
+    return `<div class="coach"><span class="coach-label">AI 关键追问</span><p>星球在想一个值得问你的问题，稍等一下。</p></div>`;
   }
   // When the AI can't be reached, leave it out: the fixed feedback above stands on its own.
   if (coach.status === "error") return "";
@@ -515,6 +571,10 @@ function openProblem() {
           document.getElementById("problemWarn").textContent = "再具体一点点。至少写出一个场景、一个感受，或一个你已经尝试过的动作。";
           return;
         }
+        if (text !== life.answers.coreProblem) {
+          delete life.aiCoach.coreProblem;
+          if (life.answers.followups) delete life.answers.followups.coreProblem;
+        }
         life.answers.coreProblem = text;
         life.problem = classifyProblem(text);
         markCompleted(life, "coreProblem");
@@ -537,6 +597,8 @@ function openProblem() {
     </div>
   `);
 }
+
+let latestCoachRequest = 0;
 
 function showProblemResult(requestCoach) {
   const p = life.problem;
@@ -584,7 +646,9 @@ function showProblemResult(requestCoach) {
     return;
   }
   els.sheetBody.innerHTML = render({ status: "loading" });
+  const requestId = ++latestCoachRequest;
   requestCoreProblemCoach(life).then(coach => {
+    if (requestId !== latestCoachRequest) return;
     life.aiCoach.coreProblem = coach;
     saveLifeState(life);
     if (sheetState?.token === token) els.sheetBody.innerHTML = render(coach);
@@ -596,8 +660,14 @@ function sortedScores() {
   return dashboardItems.map(item => ({ ...item, score: Number(d[item.key] ?? 5) })).sort((a, b) => a.score - b.score);
 }
 
+function diaryPrerequisites() {
+  // Returning questionnaire users and previously issued postcards keep access.
+  if (isDone("sign")) return [];
+  return QUESTS.filter(q => q.id !== "sign" && !isDone(q.id)).map(q => q.id);
+}
+
 function openDiary() {
-  const missing = SCORE_IDS.filter(id => !isDone(id));
+  const missing = diaryPrerequisites();
   if (missing.length) {
     const names = missing.map(id => QUESTS.find(q => q.id === id).name).join("、");
     openSheet({ focusId: "sign" }, `
@@ -616,29 +686,37 @@ function openDiary() {
     return;
   }
   openDiary.editing = false;
-  const low = sortedScores()[0];
+  const sorted = sortedScores();
+  const low = sorted[0];
+  const high = sorted[sorted.length - 1];
+  // When nothing is low there is no red light to name: ask what is worth keeping instead.
+  const bright = low.score >= 7;
   openSheet({
     focusId: "sign",
     actions: {
       submit() {
         const note = document.getElementById("noteInput").value.trim();
         if (note.length < 4) {
-          document.getElementById("noteWarn").textContent = "请写一句最亮红灯的观察。分数是仪表，原因才是设计材料。";
+          document.getElementById("noteWarn").textContent = "写一句就好，几个字也行。分数是仪表，原因才是设计材料。";
           return;
         }
+        const first = !life.completed.includes("dashboard");
         life.answers.dashboard.note = note;
         markCompleted(life, "dashboard");
         persist();
         celebrate("sign", 9);
-        showPostcard();
+        if (first) finale();
+        else showPostcard();
       }
     }
   }, `
     <div class="sheet-kicker">星球日记</div>
-    <h2 class="sheet-title" id="sheetTitle">走完一圈，最暗的地方是「${low.label}」。</h2>
-    <p class="sheet-story">这里没有好坏评判，只有一个设计事实：如果红灯项长期被忽略，其他项迟早会替它付账。</p>
-    <p class="sheet-question">写一句：哪一项已经亮红灯，为什么？</p>
-    <textarea id="noteInput" placeholder="比如：${low.label}只有 ${low.score} 分，因为……">${escapeHTML(life.answers.dashboard.note || "")}</textarea>
+    <h2 class="sheet-title" id="sheetTitle">${bright ? "走完一圈，每一处都还亮着。" : `走完一圈，最需要照看的是「${low.label}」。`}</h2>
+    <p class="sheet-story">${bright
+      ? "这很难得。分数只是仪表，写下它为什么亮着，以后暗下来的时候才知道往哪儿找。"
+      : "这里没有好坏评判。分数只是仪表，写下原因，才知道可以从哪儿开始照看它。"}</p>
+    <p class="sheet-question">${bright ? "写一句：哪一处你最想守住，为什么？" : `写一句：「${low.label}」为什么是现在这个分数？`}</p>
+    <textarea id="noteInput" placeholder="${bright ? `比如：${high.label}有 ${high.score} 分，因为……` : `比如：${low.label}只有 ${low.score} 分，因为……`}">${escapeHTML(life.answers.dashboard.note || "")}</textarea>
     <p class="sheet-warn" id="noteWarn"></p>
     <div class="sheet-actions">
       <button class="btn btn-ghost" type="button" data-action="close">稍后</button>
@@ -655,28 +733,63 @@ const NEXT_PLANETS = [
   ["三岔路星", "三个五年奥德赛计划"]
 ];
 
+// Walking the full loop earns a look at the whole planet before the postcard arrives.
+function finale() {
+  closeSheet();
+  setOverview();
+  cam.spinUntil = clockNow + 3.2;
+  sound.sparkle();
+  showToast("走完一圈了。看看你的星球现在的样子。");
+  setTimeout(() => {
+    if (sheetState) return;
+    if (cam.mode === "overview") setFollow();
+    showPostcard();
+  }, 3000);
+}
+
+function postcardFile(url) {
+  try {
+    const bin = atob(url.split(",")[1]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    return new File([bytes], "我的小星球.png", { type: "image/png" });
+  } catch (error) {
+    return null;
+  }
+}
+
 function showPostcard() {
   const url = makePostcard();
+  // On a phone the system share sheet is the natural way out (save, WeChat, Xiaohongshu);
+  // elsewhere a plain download. Long-press on the image still works where neither does.
+  const touch = window.matchMedia?.("(pointer: coarse)").matches;
+  const file = touch ? postcardFile(url) : null;
+  const canShare = Boolean(file && navigator.canShare?.({ files: [file] }));
   const html = `
     <div class="sheet-kicker">星球日记 · 明信片</div>
     <h2 class="sheet-title" id="sheetTitle">这是你的星球，现在的样子。</h2>
-    <p class="sheet-story">长按图片保存。这只是这一季的快照，过一阵再来，它会因为你做的小事而变。</p>
+    <p class="sheet-story">${touch ? "长按图片可以保存。" : ""}这只是这一季的快照，过一阵再来，它会因为你做的小事而变。</p>
     <div class="postcard-wrap"><img src="${url}" alt="我的小星球明信片"></div>
     <div class="sheet-actions is-sticky">
-      <a class="btn btn-primary" href="${url}" download="我的小星球.png">保存明信片</a>
-      <button class="btn btn-ghost" type="button" data-action="edit">改写日记</button>
+      ${canShare
+        ? `<button class="btn btn-primary" type="button" data-action="share">分享明信片</button>`
+        : `<a class="btn btn-primary" href="${url}" download="我的小星球.png">保存明信片</a>`}
       <a class="btn btn-ghost" href="${FULL_URL}">继续旅程</a>
     </div>
     <ul class="next-planets">
       ${NEXT_PLANETS.map(([name, sub]) => `<li><span>${name}</span><span>${sub} · 筹建中</span></li>`).join("")}
     </ul>
     <p class="sheet-story" style="margin-top:10px;font-size:12px">其他星球正在建造。在此之前，“继续旅程”会带你进入完整问卷，进度已经接上。</p>
+    <button class="btn-text" type="button" data-action="edit">改写日记</button>
   `;
   const actions = {
     edit() {
       closeSheet();
       openDiary.editing = true;
       openDiary();
+    },
+    share() {
+      navigator.share({ files: [file], title: "我的小星球" }).catch(() => {});
     }
   };
   if (sheetState) {
@@ -711,6 +824,7 @@ function goTo(id) {
   if (cam.mode === "intro" || cam.mode === "overview") setFollow();
   const obj = objects[id];
   if (!obj) return;
+  player.groundTarget = null;
   if (player.dir.angleTo(obj.dir) <= obj.reach + 0.02) {
     openObject(id);
     return;
@@ -795,7 +909,7 @@ function makePostcard(linkText = SHARE_HOST) {
   const yaw = Math.atan2(POLE.x, POLE.z) - 0.5;
   const pitch = 0.62;
   const view = new THREE.Vector3(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw));
-  shotCam.position.copy(view).multiplyScalar(distanceFor(16.2));
+  shotCam.position.copy(view).multiplyScalar(distanceFor(11.9));
   shotCam.up.set(0, 1, 0);
   shotCam.lookAt(0, 0, 0);
   applyView(shotCam, 1);
@@ -966,6 +1080,34 @@ els.overviewBtn.addEventListener("click", () => {
   else setOverview();
 });
 
+// A returning visitor is recognised: the intro says where they left off instead of explaining again.
+function renderIntro() {
+  const done = QUESTS.filter(q => isDone(q.id)).length;
+  if (!done) return;
+  const next = nextQuest();
+  els.intro.querySelector(".intro-kicker").textContent = `欢迎回来 · 星球 ${planet.code}`;
+  els.intro.querySelector("p").innerHTML = next
+    ? `你已经走过 ${done} 站，还剩 ${QUESTS.length - done} 站。<br>星球替你记着，接着走就好。`
+    : "星球还是你离开时的样子。<br>过了一阵，分数也许已经不一样了。<br>回去走走，改一改，再画一张新的明信片。";
+  els.startBtn.textContent = "回到星球";
+  els.startBtn.style.letterSpacing = "0.2em";
+  els.startBtn.style.paddingLeft = "calc(18px + 0.2em)";
+  els.intro.querySelector("small").textContent = next ? `下一站 · ${next.name}` : "6 个小站都走过了 · 随时可以改";
+}
+
+// The sheet is pinned to the bottom of the layout viewport; on iOS the keyboard covers that edge
+// without resizing it, so lift the sheet by the keyboard's height while one is up.
+if (window.visualViewport) {
+  const vv = window.visualViewport;
+  const fitSheet = () => {
+    const keyboard = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    els.sheet.style.bottom = keyboard > 80 ? `${keyboard}px` : "";
+    els.sheet.style.maxHeight = keyboard > 80 ? `${Math.max(240, vv.height - 12)}px` : "";
+  };
+  vv.addEventListener("resize", fitSheet);
+  vv.addEventListener("scroll", fitSheet);
+}
+
 els.startBtn.addEventListener("click", () => {
   sound.start();
   setFollow();
@@ -984,10 +1126,12 @@ function updateCamera(dt, time) {
   const base = tmpV.copy(up).multiplyScalar(surfaceRadius(up));
   if (cam.mode === "intro" || cam.mode === "overview") {
     if (cam.mode === "intro") orbit.yaw += dt * 0.05;
+    // The finale turns the finished planet slowly once before the postcard comes up.
+    else if (time < (cam.spinUntil ?? 0)) orbit.yaw += dt * 0.28;
     orbitDirection(desired.dir);
     desired.look.set(0, cam.mode === "intro" ? INTRO_LOOK_Y : 0, 0);
     desired.up.set(0, 1, 0);
-    desired.view = cam.mode === "intro" ? introView() : viewHeightFor(17 * orbit.scale, 17.5 * orbit.scale);
+    desired.view = cam.mode === "intro" ? introView() : viewHeightFor(12.5 * orbit.scale, 12.8 * orbit.scale);
   } else if (cam.mode === "focus" && objects[cam.focusId]) {
     const obj = objects[cam.focusId];
     const od = obj.dir;
@@ -1016,15 +1160,15 @@ function updateCamera(dt, time) {
     if (near) desired.look.lerp(tmpV.copy(travelerPos).addScaledVector(od, 0.5), 0.3);
     // Fit them into the part of the screen the HUD and the sheet leave free.
     const free = THREE.MathUtils.clamp(1 - ((sheetState ? els.sheet.offsetHeight : 0) + HUD_HEIGHT) / window.innerHeight, 0.4, 1);
-    const fit = Math.max(3.6 * obj.focus, gap * 1.9 + 1.4);
-    desired.view = viewHeightFor(fit, fit) * (1 + (1 - free) * 0.55);
+    const fit = Math.max(2.9 * obj.focus, gap * 1.7 + 1.15);
+    desired.view = viewHeightFor(fit, fit) * (1 + (1 - free) * 0.45);
     const punch = (time - react.hop) / 0.6;
     if (punch > 0 && punch < 1) desired.view *= 1 - Math.sin(punch * Math.PI) * 0.08;
   } else {
     desired.dir.copy(up).multiplyScalar(Math.sin(ELEVATION)).addScaledVector(camForward, -Math.cos(ELEVATION));
     desired.look.copy(base).addScaledVector(up, 0.5).addScaledVector(camForward, 0.6);
     desired.up.copy(up);
-    desired.view = viewHeightFor(6.5 * cam.zoom, 4.2 * cam.zoom);
+    desired.view = viewHeightFor(5.0 * cam.zoom, 3.2 * cam.zoom);
   }
   // Dive: a short anticipation (the wide view eases out a little), then a slower, smooth descent.
   const diveT = time - (cam.dive ?? -10);
@@ -1036,7 +1180,10 @@ function updateCamera(dt, time) {
   }
   // A director (used by the promo renderer) may take over the framing; it gets the same smoothing.
   if (cam.director) cam.director(desired, time);
-  const rate = cam.directorRate ?? (diveT < 1.6 ? 2.6 : cam.mode === "follow" ? 7 : 3);
+  const baseRate = cam.directorRate ?? (diveT < 1.6 ? 2.6 : cam.mode === "follow" ? 7 : 3);
+  // The bench handoff eases for about two seconds, both ways. Other stops keep their pace.
+  const handingBench = !cam.director && ((cam.mode === "focus" && cam.focusId === "bench") || benchGaze > 0.03);
+  const rate = handingBench ? 1.35 : baseRate;
   const k = 1 - Math.exp(-dt * rate);
   cam.dir.lerp(desired.dir, k).normalize();
   cam.look.lerp(desired.look, k);
@@ -1066,6 +1213,7 @@ function updateCamera(dt, time) {
 
 function resolveCollisions() {
   world.blockers.forEach(b => {
+    if (player.sitting && b.dir === objects.bench.dir) return;
     const angle = player.dir.angleTo(b.dir);
     if (angle < b.radius) {
       const t = tangentToward(b.dir, player.dir);
@@ -1092,6 +1240,13 @@ const moveDir = new THREE.Vector3();
 const right = new THREE.Vector3();
 
 function updatePlayer(dt, time) {
+  if (player.sitting) {
+    seatOnBench();
+    traveler.eyes?.forEach(eye => { eye.scale.y = Math.sin(time * 0.8) > 0.97 ? 0.08 : 1.25; });
+    updateNearby();
+    return;
+  }
+
   let ix = input.x;
   let iy = input.y;
   if (input.keys.has("KeyA") || input.keys.has("ArrowLeft")) ix -= 1;
@@ -1106,32 +1261,36 @@ function updatePlayer(dt, time) {
 
   if (canMove && mag > 0.05) {
     autoTarget = null;
+    player.groundTarget = null;
     right.crossVectors(camForward, player.dir);
     moveDir.copy(right).multiplyScalar(ix).addScaledVector(camForward, iy).normalize();
-    speed = 2.6 * mag;
+    speed = 2.0 * mag;
   } else if (sheetState && player.standTarget) {
     // Step aside while a sheet is open, then turn to face the object.
     player.standTime -= dt;
     if (player.dir.angleTo(player.standTarget) > 0.01 && player.standTime > 0) {
       tangentToward(player.dir, player.standTarget, moveDir);
-      speed = 1.6;
+      speed = 1.5;
     } else {
       player.standTarget = null;
     }
   } else if (canMove && autoTarget) {
     const obj = objects[autoTarget];
     tangentToward(player.dir, obj.dir, moveDir);
-    speed = 2.8;
+    speed = 2.15;
     if (player.dir.angleTo(obj.dir) <= obj.reach) {
       const id = autoTarget;
       autoTarget = null;
       speed = 0;
       openObject(id);
     } else {
-      // Let the camera swing round behind the walk so the target stays in view.
       camForward.lerp(moveDir, 1 - Math.exp(-dt * 1.5));
       reproject(camForward, player.dir);
     }
+  } else if (canMove && player.groundTarget) {
+    tangentToward(player.dir, player.groundTarget, moveDir);
+    speed = 2.0;
+    if (player.dir.angleTo(player.groundTarget) < 0.03) player.groundTarget = null;
   }
 
   if (sheetState && !player.standTarget && player.lookTarget) {
@@ -1143,7 +1302,6 @@ function updatePlayer(dt, time) {
   if (speed > 0) {
     const before = player.dir.clone();
     movePlayer(moveDir, Math.min(speed * dt, player.standTarget ? player.dir.angleTo(player.standTarget) * R : Infinity));
-    // Sliding along a blocker: walk in the direction actually travelled.
     const travelled = tangentToward(before, player.dir);
     if (travelled.lengthSq() > 0.5) player.facing.lerp(travelled, 1 - Math.exp(-dt * 12));
     reproject(player.facing, player.dir);
@@ -1157,20 +1315,21 @@ function updatePlayer(dt, time) {
   traveler.group.quaternion.setFromRotationMatrix(tmpM);
   traveler.group.position.copy(up).multiplyScalar(surfaceRadius(up) - 0.01);
 
-  const s = Math.min(1, player.speed / 2.6);
+  // One stride is about 0.6 world units of arc, so the feet plant without sliding.
+  const s = Math.min(1, player.speed / 2.0);
   const prevStep = Math.sin(player.phase);
-  player.phase += dt * (3 + player.speed * 3.2);
+  player.phase += dt * Math.max(player.speed, 0.001) * Math.PI / 0.6 * (s > 0.05 ? 1 : 0);
   if (s > 0.4 && Math.sign(prevStep) !== Math.sign(Math.sin(player.phase))) {
     world.kickDust(traveler.group.position, player.dir);
     sound.step();
   }
-  const swing = Math.sin(player.phase) * 0.75 * s;
+  const swing = Math.sin(player.phase) * 0.9 * s;
   traveler.legs[0].rotation.x = swing;
   traveler.legs[1].rotation.x = -swing;
   traveler.arms[0].rotation.x = -swing * 0.7;
   traveler.arms[1].rotation.x = swing * 0.7;
+  traveler.group.rotateX(-0.12 * s);
   const idle = 1 - s;
-  // Hop on a confirmed answer; squash on landing from the dive; breathe and glance around when idle.
   const hopT = (time - react.hop) / 0.45;
   const hop = hopT > 0 && hopT < 1 ? Math.sin(hopT * Math.PI) : 0;
   const landT = time - react.land;
@@ -1182,9 +1341,12 @@ function updatePlayer(dt, time) {
   traveler.head.rotation.z = Math.sin(time * 1.3) * 0.04 * idle;
   traveler.head.rotation.x = -hop * 0.25;
   traveler.head.rotation.y = Math.sin(time * 0.37) * Math.sin(time * 0.23 + 1) * 0.7 * idle * (sheetState ? 0.2 : 1);
-  traveler.pack.position.y = 0.58 + Math.abs(Math.cos(player.phase)) * 0.025 * s;
+  traveler.pack.position.y = 0.58 - (traveler.drop ?? TRAVELER_DROP) + Math.abs(Math.cos(player.phase)) * 0.025 * s;
   traveler.pack.rotation.x = -0.08 * s;
   traveler.charm.rotation.z = Math.sin(player.phase) * 0.5 * s + Math.sin(time * 1.7) * 0.08;
+  traveler.scarf.rotation.z = 0.12 + Math.sin(player.phase + 0.6) * 0.22 * s + Math.sin(time * 1.9) * 0.05;
+  traveler.scarf.rotation.x = -0.12 - 0.18 * s * (0.6 + 0.4 * Math.sin(player.phase * 2));
+  traveler.eyes?.forEach(eye => { eye.scale.y = Math.sin(time * 0.8) > 0.97 ? 0.08 : 1.25; });
 
   updateNearby();
 }
@@ -1238,7 +1400,8 @@ function occludedByPlanet(point) {
 function updateLabels() {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  labelEls.forEach(label => {
+  const nextId = nextQuest()?.id;
+  const candidates = labelEls.map(label => {
     let visible = !sheetState;
     if (label.far) {
       const p = farPlanets.find(item => item.id === label.id);
@@ -1257,9 +1420,22 @@ function updateLabels() {
     if (sx < 44 || sx > w - 44 || sy < 120 || sy > h - 24) visible = false;
     // The intro copy already names every stop; labels appear once the traveler lands.
     if (cam.mode === "intro") visible = false;
-    label.el.style.opacity = visible ? (label.el.classList.contains("is-locked") ? "0.65" : "1") : "0";
-    if (visible) {
-      label.el.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
+    const rank = label.far ? 0
+      : label.id === nextId ? 5
+        : label.id === lastNearId ? 4
+          : isDone(label.id) ? 1 : 3;
+    return { label, visible, sx, sy, rank };
+  });
+  candidates.sort((a, b) => b.rank - a.rank);
+  const placed = [];
+  candidates.forEach(item => {
+    if (item.visible && placed.some(other => Math.hypot(other.sx - item.sx, other.sy - item.sy) < 58)) {
+      item.visible = false;
+    }
+    if (item.visible) placed.push(item);
+    item.label.el.style.opacity = item.visible ? (item.label.el.classList.contains("is-locked") ? "0.65" : "1") : "0";
+    if (item.visible) {
+      item.label.el.style.transform = `translate(${item.sx}px, ${item.sy}px) translate(-50%, -100%)`;
     }
   });
 }
@@ -1273,19 +1449,75 @@ Object.values(objects).forEach(obj => obj.hit.forEach(mesh => { hitList.push(mes
 farPlanets.forEach(p => p.hit.forEach(mesh => { hitList.push(mesh); hitOwner.set(mesh, { type: "far", planet: p }); }));
 
 function handleTap(clientX, clientY) {
+  // Labels stay pointer-events:none so dragging still rotates the view; hit-test their boxes here.
+  for (const label of labelEls) {
+    if (label.far || label.el.style.opacity === "0") continue;
+    const r = label.el.getBoundingClientRect();
+    if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+      goTo(label.id);
+      return;
+    }
+  }
   const ndc = new THREE.Vector2((clientX / window.innerWidth) * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
   const hit = raycaster.intersectObjects(hitList, false)[0];
-  if (!hit) return;
-  const owner = hitOwner.get(hit.object);
-  if (owner.type === "object") goTo(owner.id);
-  else openFarPlanet(owner.planet);
+  if (hit) {
+    const owner = hitOwner.get(hit.object);
+    if (owner.type === "object") goTo(owner.id);
+    else openFarPlanet(owner.planet);
+    return;
+  }
+  // Soft screen-space proximity: a near miss on a prop still counts as a tap on it.
+  let best = null;
+  let bestDist = 48;
+  Object.values(objects).forEach(obj => {
+    const p = obj.dir.clone().multiplyScalar(R + obj.labelHeight * 0.35).project(camera);
+    if (p.z > 1) return;
+    const sx = (p.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-p.y * 0.5 + 0.5) * window.innerHeight;
+    const d = Math.hypot(sx - clientX, sy - clientY);
+    if (d < bestDist) { best = obj; bestDist = d; }
+  });
+  if (best) {
+    goTo(best.id);
+    return;
+  }
+  // Analytic hit on the planet sphere: walk to that point.
+  if (cam.mode !== "follow" || sheetState) return;
+  const origin = raycaster.ray.origin;
+  const dir = raycaster.ray.direction;
+  const b = origin.dot(dir);
+  const c = origin.lengthSq() - R * R;
+  const disc = b * b - c;
+  if (disc < 0) return;
+  const t = -b - Math.sqrt(disc);
+  if (t < 0) return;
+  player.groundTarget = origin.clone().addScaledVector(dir, t).normalize();
+  autoTarget = null;
 }
 
 const pointers = new Map();
 let joystickId = null;
+let stickCandidate = null;
 let joystickOrigin = { x: 0, y: 0 };
 let pinchStart = null;
+const STICK_SLOP = 10;
+
+function stickZone(event) {
+  return event.pointerType !== "mouse"
+    && cam.mode === "follow"
+    && event.clientX < window.innerWidth * 0.45
+    && event.clientY > window.innerHeight * 0.3;
+}
+
+function hideStick() {
+  joystickId = null;
+  stickCandidate = null;
+  input.x = 0;
+  input.y = 0;
+  els.joystick.style.display = "none";
+  els.joystickKnob.style.transform = "translate(0, 0)";
+}
 
 els.canvas.addEventListener("pointerdown", event => {
   try {
@@ -1293,18 +1525,17 @@ els.canvas.addEventListener("pointerdown", event => {
   } catch (error) {
     // Synthetic or already-released pointers can't be captured; dragging still works without it.
   }
-  const isTouch = event.pointerType !== "mouse";
   const p = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: performance.now(), moved: 0 };
   pointers.set(event.pointerId, p);
-  if (isTouch && joystickId === null && cam.mode === "follow" && event.clientX < window.innerWidth * 0.45 && event.clientY > window.innerHeight * 0.3) {
-    joystickId = event.pointerId;
+  // A second finger means pinch or two-handed tap, never navigation.
+  if (pointers.size > 1) pointers.forEach(pointer => { pointer.multi = true; });
+  // Claim the corner, but don't walk yet: a tap that barely moves still has to open a label.
+  if (joystickId === null && stickCandidate === null && stickZone(event)) {
+    stickCandidate = event.pointerId;
     joystickOrigin = { x: event.clientX, y: event.clientY };
-    els.joystick.style.display = "block";
-    els.joystick.style.left = `${event.clientX}px`;
-    els.joystick.style.top = `${event.clientY}px`;
-    els.joystickKnob.style.transform = "translate(0, 0)";
   }
-  const touches = [...pointers.entries()].filter(([id]) => id !== joystickId);
+  const held = new Set([joystickId, stickCandidate]);
+  const touches = [...pointers.entries()].filter(([id]) => !held.has(id));
   if (touches.length === 2) {
     const [a, b] = touches.map(([, value]) => value);
     pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: cam.zoom, orbitScale: orbit.scale };
@@ -1319,21 +1550,31 @@ els.canvas.addEventListener("pointermove", event => {
   p.x = event.clientX;
   p.y = event.clientY;
   p.moved = Math.max(p.moved, Math.hypot(event.clientX - p.startX, event.clientY - p.startY));
+  if (event.pointerId === stickCandidate && p.moved < STICK_SLOP) return;
+  if (event.pointerId === stickCandidate) {
+    joystickId = stickCandidate;
+    stickCandidate = null;
+    els.joystick.style.display = "block";
+    els.joystick.style.left = `${joystickOrigin.x}px`;
+    els.joystick.style.top = `${joystickOrigin.y}px`;
+  }
   if (event.pointerId === joystickId) {
+    if (p.moved < 10) return;
     const max = 50;
     let jx = event.clientX - joystickOrigin.x;
     let jy = event.clientY - joystickOrigin.y;
     const len = Math.hypot(jx, jy);
-    if (len > max) {
-      jx = (jx / len) * max;
-      jy = (jy / len) * max;
-    }
-    els.joystickKnob.style.transform = `translate(${jx}px, ${jy}px)`;
-    input.x = jx / max;
-    input.y = -jy / max;
+    const clamped = Math.min(len, max);
+    const ux = len > 0 ? jx / len : 0;
+    const uy = len > 0 ? jy / len : 0;
+    els.joystickKnob.style.transform = `translate(${ux * clamped}px, ${uy * clamped}px)`;
+    const mag = len <= STICK_SLOP ? 0 : (clamped - STICK_SLOP) / (max - STICK_SLOP);
+    input.x = ux * mag;
+    input.y = -uy * mag;
     return;
   }
-  const others = [...pointers.entries()].filter(([id]) => id !== joystickId);
+  const held = new Set([joystickId, stickCandidate]);
+  const others = [...pointers.entries()].filter(([id]) => !held.has(id));
   if (others.length === 2 && pinchStart) {
     const [a, b] = others.map(([, value]) => value);
     const ratio = pinchStart.dist / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y));
@@ -1352,14 +1593,12 @@ function endPointer(event) {
   const p = pointers.get(event.pointerId);
   pointers.delete(event.pointerId);
   if (event.pointerId === joystickId) {
-    joystickId = null;
-    input.x = 0;
-    input.y = 0;
-    els.joystick.style.display = "none";
+    hideStick();
     return;
   }
+  if (event.pointerId === stickCandidate) stickCandidate = null;
   if (pointers.size < 2) pinchStart = null;
-  if (p && event.type === "pointerup" && p.moved < 10 && performance.now() - p.time < 400 && !sheetState) {
+  if (p && !p.multi && event.type === "pointerup" && p.moved < STICK_SLOP && performance.now() - p.time < 400 && !sheetState) {
     handleTap(event.clientX, event.clientY);
   }
 }
@@ -1409,28 +1648,64 @@ resize();
 syncWorld();
 world.snap();
 renderQuests();
+renderIntro();
 
 const clock = new THREE.Clock();
 let started = false;
 
 // Measure the frame rate for a few seconds and step effects down on slower phones.
 // `?quality=0|1|2` in the URL pins a level instead.
-const pinnedQuality = new URLSearchParams(location.search).get("quality");
-const perf = { frames: 0, time: 0, done: pinnedQuality !== null };
-if (pinnedQuality !== null) world.setQuality(Number(pinnedQuality));
+const requestedQuality = new URLSearchParams(location.search).get("quality");
+const pinnedQuality = ["0", "1", "2"].includes(requestedQuality);
+if (pinnedQuality) world.setQuality(Number(requestedQuality));
 
+const perf = { frames: 0, time: 0, fastWindows: 0, ceiling: 2, promoted: false };
+
+function resetWindow() {
+  perf.frames = 0;
+  perf.time = 0;
+}
+
+// Use sustained frame times to adjust effects. A failed promotion caps this session's tier.
 function measure(dt, time) {
-  if (perf.done || time < 1.5) return;
-  perf.frames += 1;
+  if (pinnedQuality || time < 2.5) return;
+  if (document.hidden || dt > 1) {
+    resetWindow();
+    perf.fastWindows = 0;
+    return;
+  }
+  perf.frames++;
   perf.time += dt;
   if (perf.time < 3) return;
-  perf.done = true;
   const fps = perf.frames / perf.time;
-  if (fps < 24) world.setQuality(0);
-  else if (fps < 40) world.setQuality(1);
+  resetWindow();
+  const level = world.quality;
+  perf.fastWindows = fps > 52 ? perf.fastWindows + 1 : 0;
+  if (fps < 40 && level > 0) {
+    if (perf.promoted) perf.ceiling = level - 1;
+    world.setQuality(fps < 24 ? 0 : level - 1);
+    perf.promoted = false;
+  } else if (perf.fastWindows >= 2 && level < perf.ceiling) {
+    world.setQuality(level + 1);
+    perf.promoted = true;
+    perf.fastWindows = 0;
+  }
 }
 
 const focusPoint = new THREE.Vector3();
+let benchGaze = 0;
+let benchGazeAt = performance.now();
+
+function updateBenchGaze() {
+  const now = performance.now();
+  // Wall time, capped, so a long frame still eases instead of freezing the handoff.
+  const dt = Math.min(0.2, Math.max(0, (now - benchGazeAt) / 1000));
+  benchGazeAt = now;
+  const want = cam.mode === "focus" && cam.focusId === "bench" ? 1 : 0;
+  benchGaze += (want - benchGaze) * (1 - Math.exp(-Math.max(dt, 0.001) * 1.35));
+  if (Math.abs(want - benchGaze) < 0.001) benchGaze = want;
+  world.setBenchGaze(benchGaze);
+}
 
 // Keep the tilt-shift band on whatever the camera is about: the traveler, the open object, or the planet.
 function updateFocus() {
@@ -1440,17 +1715,35 @@ function updateFocus() {
   world.setFocus(THREE.MathUtils.clamp(focusPoint.project(camera).y * 0.5 + 0.5, 0.1, 0.9));
 }
 
+function updateSeeThrough() {
+  if (!world.setSeeThrough) return;
+  if (cam.mode !== "follow" || player.sitting) {
+    world.setSeeThrough(0, 0, 0, 0);
+    return;
+  }
+  const head = traveler.group.position.clone().addScaledVector(player.dir, 0.95);
+  // Mesh shaders use vViewPosition = -mvPosition, so depth in front of the camera is positive.
+  const viewZ = -head.clone().applyMatrix4(camera.matrixWorldInverse).z;
+  const projected = head.project(camera);
+  const size = world.renderer.getDrawingBufferSize(new THREE.Vector2());
+  const cx = (projected.x * 0.5 + 0.5) * size.x;
+  const cy = (projected.y * 0.5 + 0.5) * size.y;
+  world.setSeeThrough(cx, cy, Math.max(size.x, size.y) * 0.16, viewZ);
+}
+
 function frame() {
   const rawDt = clock.getDelta();
   const dt = Math.min(rawDt, 0.05);
   const time = clock.elapsedTime;
   measure(rawDt, time);
   clockNow = time;
+  updateBenchGaze();
   world.update(dt, time);
   sound.tick(Number(life.answers.dashboard.play ?? 5) / 10);
   updatePlayer(dt, time);
   updateCamera(dt, time);
   updateFocus();
+  updateSeeThrough();
   world.render(camera, time);
   updateLabels();
   if (!started) {

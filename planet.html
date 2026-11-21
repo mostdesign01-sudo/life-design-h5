@@ -88,13 +88,12 @@
     }
 
     .quest-card {
-      background: var(--paper);
+      /* Solid paper: a live WebGL canvas behind backdrop-filter can drop the card's text on some GPUs. */
+      background: var(--paper-solid);
       border-radius: var(--radius);
       padding: 10px 12px;
       box-shadow: 0 10px 30px rgba(20, 10, 40, 0.25);
       max-width: 240px;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
     }
 
     .quest-head {
@@ -423,6 +422,15 @@
 
     .postcard-wrap { text-align: center; }
     .postcard-wrap img { width: 100%; border-radius: 14px; box-shadow: 0 10px 30px rgba(20, 10, 40, 0.25); }
+    /* The card is set down on the table rather than simply appearing. */
+    @keyframes cardDrop {
+      from { opacity: 0; transform: translateY(26px) rotate(-3deg) scale(0.94); }
+      to { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .sheet.is-open .postcard-wrap img { animation: cardDrop 0.8s 0.25s both cubic-bezier(.2,.9,.25,1.05); }
+    }
+    .btn-text { display: block; margin: 6px auto 0; border: 0; background: none; min-height: 40px; padding: 0 12px; font-size: 13px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
     .next-planets { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 6px; }
     .next-planets li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 8px 10px; border-radius: 10px; background: rgba(35, 29, 43, 0.04); }
@@ -526,7 +534,7 @@
     <h1>你的小星球</h1>
     <p>泉水、工坊、晚霞、双生灯，<br>是你的健康、工作、娱乐和爱。<br>缠绕藤是此刻的困扰，<br>走完一圈，日记会把它们画成一张明信片。</p>
     <button class="btn btn-primary" id="startBtn" type="button">降落</button>
-    <small>约 3 分钟 · 6 个小站</small>
+    <small>约 3 分钟 · 6 个小站 · 有轻柔的声音</small>
   </div>
 
   <div class="loading" id="loading">正在靠近你的星球…</div>
