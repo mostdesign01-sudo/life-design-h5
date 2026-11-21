@@ -254,8 +254,9 @@ function renderQuests() {
     </li>
   `).join("");
   const next = nextQuest();
-  const diaryReady = SCORE_IDS.every(isDone);
-  world.setDiaryReady(diaryReady);
+  const diaryWritten = isDone("sign");
+  const diaryReady = diaryPrerequisites().length === 0;
+  world.setDiaryReady(diaryReady, diaryWritten);
   labelEls.forEach(label => {
     label.el.classList.toggle("is-done", !label.far && isDone(label.id));
     label.el.classList.toggle("is-next", !label.far && label.id === next?.id);
@@ -659,8 +660,14 @@ function sortedScores() {
   return dashboardItems.map(item => ({ ...item, score: Number(d[item.key] ?? 5) })).sort((a, b) => a.score - b.score);
 }
 
+function diaryPrerequisites() {
+  // Returning questionnaire users and previously issued postcards keep access.
+  if (isDone("sign")) return [];
+  return QUESTS.filter(q => q.id !== "sign" && !isDone(q.id)).map(q => q.id);
+}
+
 function openDiary() {
-  const missing = SCORE_IDS.filter(id => !isDone(id));
+  const missing = diaryPrerequisites();
   if (missing.length) {
     const names = missing.map(id => QUESTS.find(q => q.id === id).name).join("、");
     openSheet({ focusId: "sign" }, `

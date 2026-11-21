@@ -769,11 +769,23 @@ export function buildSignpost() {
   lamp.position.y = 1.16;
   lamp.userData.keep = true;
   group.add(lamp);
+  // A folded gold pennant stays on the diary post once a page has been written.
+  const cloth = new THREE.BufferGeometry();
+  cloth.setAttribute("position", new THREE.Float32BufferAttribute([
+    0, 1.09, 0.03, 0, 0.90, 0.03, -0.15, 0.94, 0.08,
+    0, 1.09, 0.03, -0.15, 0.94, 0.08, -0.15, 1.11, 0.08,
+    -0.15, 1.11, 0.08, -0.15, 0.94, 0.08, -0.36, 1.06, 0.01
+  ], 3));
+  cloth.computeVertexNormals();
+  const pennant = new THREE.Mesh(cloth, mat(0xf8c669, { side: THREE.DoubleSide }));
+  pennant.userData.keep = true;
+  pennant.visible = false;
+  group.add(pennant);
   const halo = addHalo(group, lamp.position, 0.45);
   addBlob(group, 0.3, 0.4);
   shadow(group);
   mergeStatic(group);
-  return { group, gem: lamp, halo };
+  return { group, gem: lamp, halo, pennant };
 }
 
 // How much shorter the legs are than a realistic figure's; everything above them drops to match.

@@ -279,8 +279,9 @@ export function createWorld(canvas) {
   }
 
   let diaryReady = false;
-  function setDiaryReady(ready) {
+  function setDiaryReady(ready, written = false) {
     diaryReady = ready;
+    sign.pennant.visible = written;
   }
 
   let cull = null;
