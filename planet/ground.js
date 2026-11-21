@@ -149,6 +149,7 @@ function tuftGeometry() {
   const blades = 7;
   const segs = 2;
   const positions = [];
+  const indices = [];
   const normals = [];
   const uvs = [];
   const rand = (() => { let s = 7; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; })();
@@ -162,30 +163,24 @@ function tuftGeometry() {
     const h = TUFT_H * (0.86 + rand() * 0.14);
     const w = 0.05;
     const width = t => w * (1 - t * t * 0.72);
-    for (let s = 0; s < segs; s += 1) {
-      const t0 = s / segs;
-      const t1 = (s + 1) / segs;
-      const y0 = t0 * h;
-      const y1 = t1 * h;
-      const z0 = bz + lean * t0 * t0;
-      const z1 = bz + lean * t1 * t1;
-      const wx0 = Math.cos(face) * width(t0);
-      const wz0 = Math.sin(face) * width(t0);
-      const wx1 = Math.cos(face) * width(t1);
-      const wz1 = Math.sin(face) * width(t1);
-      const verts = [
-        [bx - wx0, y0, z0 - wz0], [bx + wx0, y0, z0 + wz0], [bx + wx1, y1, z1 + wz1],
-        [bx - wx0, y0, z0 - wz0], [bx + wx1, y1, z1 + wz1], [bx - wx1, y1, z1 - wz1]
-      ];
-      verts.forEach(v => {
-        positions.push(...v);
-        // Lit as the ground it grows from, so the lawn shades as one surface, not blade by blade.
-        normals.push(0, 1, 0);
-        uvs.push(v[1] / h, v[1] / h);
-      });
+    const first = positions.length / 3;
+    for (let row = 0; row <= segs; row += 1) {
+      const t = row / segs;
+      const y = t * h;
+      const z = bz + lean * t * t;
+      const wx = Math.cos(face) * width(t);
+      const wz = Math.sin(face) * width(t);
+      positions.push(bx - wx, y, z - wz, bx + wx, y, z + wz);
+      normals.push(0, 1, 0, 0, 1, 0);
+      uvs.push(y / h, y / h, y / h, y / h);
+      if (row < segs) {
+        const left = first + 2 * row;
+        indices.push(left, left + 1, left + 3, left, left + 3, left + 2);
+      }
     }
   }
   const geo = new THREE.BufferGeometry();
+  geo.setIndex(indices);
   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
