@@ -957,6 +957,11 @@ async function loadTraveler(traveler) {
     return node;
   };
   const body = part("body"), head = part("head"), pack = part("pack");
+  const eyeGroup = part("eyes");
+  const eyes = [part("eyeL"), part("eyeR")];
+  if (!eyes.every(eye => eye.isMesh && eye.parent === eyeGroup)) {
+    throw new Error("Invalid traveler eye meshes");
+  }
   const charm = part("charm"), scarf = part("scarf");
   const legs = [part("legL"), part("legR")];
   const arms = [part("armL"), part("armR")];
@@ -983,7 +988,7 @@ async function loadTraveler(traveler) {
   const previous = traveler.body;
   traveler.group.add(scene);
   traveler.group.remove(previous);
-  Object.assign(traveler, { body, head, pack, charm, scarf, legs, arms, eyes: undefined, drop: TRAVELER_DROP });
+  Object.assign(traveler, { body, head, pack, charm, scarf, legs, arms, eyes, drop: TRAVELER_DROP });
   // Only the procedural body is retired. The contact shadow and shared texture
   // maps still belong to the page, as does Three's shared sprite geometry.
   const materials = new Set();
