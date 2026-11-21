@@ -570,6 +570,10 @@ function openProblem() {
           document.getElementById("problemWarn").textContent = "再具体一点点。至少写出一个场景、一个感受，或一个你已经尝试过的动作。";
           return;
         }
+        if (text !== life.answers.coreProblem) {
+          delete life.aiCoach.coreProblem;
+          if (life.answers.followups) delete life.answers.followups.coreProblem;
+        }
         life.answers.coreProblem = text;
         life.problem = classifyProblem(text);
         markCompleted(life, "coreProblem");
@@ -592,6 +596,8 @@ function openProblem() {
     </div>
   `);
 }
+
+let latestCoachRequest = 0;
 
 function showProblemResult(requestCoach) {
   const p = life.problem;
@@ -639,7 +645,9 @@ function showProblemResult(requestCoach) {
     return;
   }
   els.sheetBody.innerHTML = render({ status: "loading" });
+  const requestId = ++latestCoachRequest;
   requestCoreProblemCoach(life).then(coach => {
+    if (requestId !== latestCoachRequest) return;
     life.aiCoach.coreProblem = coach;
     saveLifeState(life);
     if (sheetState?.token === token) els.sheetBody.innerHTML = render(coach);
