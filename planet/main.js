@@ -809,6 +809,7 @@ function goTo(id) {
   if (cam.mode === "intro" || cam.mode === "overview") setFollow();
   const obj = objects[id];
   if (!obj) return;
+  player.groundTarget = null;
   if (player.dir.angleTo(obj.dir) <= obj.reach + 0.02) {
     openObject(id);
     return;
@@ -1491,6 +1492,7 @@ els.canvas.addEventListener("pointerdown", event => {
   const isTouch = event.pointerType !== "mouse";
   const p = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, time: performance.now(), moved: 0 };
   pointers.set(event.pointerId, p);
+  if (pointers.size > 1) pointers.forEach(pointer => { pointer.multi = true; });
   if (isTouch && joystickId === null && cam.mode === "follow" && event.clientX < window.innerWidth * 0.45 && event.clientY > window.innerHeight * 0.3) {
     joystickId = event.pointerId;
     joystickOrigin = { x: event.clientX, y: event.clientY };
@@ -1515,6 +1517,7 @@ els.canvas.addEventListener("pointermove", event => {
   p.y = event.clientY;
   p.moved = Math.max(p.moved, Math.hypot(event.clientX - p.startX, event.clientY - p.startY));
   if (event.pointerId === joystickId) {
+    if (p.moved < 10) return;
     const max = 50;
     let jx = event.clientX - joystickOrigin.x;
     let jy = event.clientY - joystickOrigin.y;
@@ -1551,10 +1554,9 @@ function endPointer(event) {
     input.x = 0;
     input.y = 0;
     els.joystick.style.display = "none";
-    return;
   }
   if (pointers.size < 2) pinchStart = null;
-  if (p && event.type === "pointerup" && p.moved < 10 && performance.now() - p.time < 400 && !sheetState) {
+  if (p && !p.multi && event.type === "pointerup" && p.moved < 10 && performance.now() - p.time < 400 && !sheetState) {
     handleTap(event.clientX, event.clientY);
   }
 }
