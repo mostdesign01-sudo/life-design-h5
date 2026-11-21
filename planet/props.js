@@ -788,11 +788,13 @@ export function buildSignpost() {
   return { group, gem: lamp, halo, pennant };
 }
 
-// How much shorter the legs are than a realistic figure's; everything above them drops to match.
-const LEG = 0.78;
-export const TRAVELER_DROP = 0.38 * (1 - LEG);
+// main.js uses a 0.38 hip reference. The exported hip pivots sit at y = 0.375.
+export const TRAVELER_DROP = 0.38 - 0.375;
 
-export function buildTraveler() {
+const LEG = 0.78;
+const PROCEDURAL_DROP = 0.38 * (1 - LEG);
+
+function buildProceduralTraveler() {
   const group = new THREE.Group();
   const body = new THREE.Group();
   group.add(body);
@@ -936,13 +938,66 @@ export function buildTraveler() {
 
   // Drop everything above the hips by what the legs lost.
   body.children.forEach(child => {
-    if (!legs.includes(child)) child.position.y -= TRAVELER_DROP;
+    if (!legs.includes(child)) child.position.y -= PROCEDURAL_DROP;
   });
 
   addBlob(group, 0.3, 0.45);
   shadow(group);
   mergeStatic(body);
-  return { group, body, legs, arms, head, pack, charm, eyes, scarf };
+  return { group, body, legs, arms, head, pack, charm, eyes, scarf, drop: PROCEDURAL_DROP };
+}
+
+async function loadTraveler(traveler) {
+  const { GLTFLoader } = await import("../vendor/three-addons/loaders/GLTFLoader.js");
+  const url = new URL("../assets/character/traveler.glb", import.meta.url);
+  const { scene } = await new GLTFLoader().loadAsync(url.href);
+  const part = name => {
+    const node = scene.getObjectByName(name);
+    if (!node) throw new Error(`Missing traveler node: ${name}`);
+    return node;
+  };
+  const body = part("body"), head = part("head"), pack = part("pack");
+  const charm = part("charm"), scarf = part("scarf");
+  const legs = [part("legL"), part("legR")];
+  const arms = [part("armL"), part("armR")];
+
+  shadow(scene);
+  scene.traverse(node => {
+    if (!node.isMesh) return;
+    node.material.vertexColors = node.geometry.hasAttribute("color");
+    node.material.envMapIntensity = node.material.name === "Textiles" ? 0.15 : 0.3;
+  });
+
+  // Loading may finish mid-stride or on the bench. Transfer animation deltas
+  // while retaining the bind positions and joint scales authored in Blender.
+  body.position.y = traveler.body.position.y;
+  body.scale.copy(traveler.body.scale);
+  head.rotation.copy(traveler.head.rotation);
+  pack.position.y += traveler.pack.position.y - (0.58 - traveler.drop);
+  pack.rotation.copy(traveler.pack.rotation);
+  charm.rotation.copy(traveler.charm.rotation);
+  scarf.rotation.copy(traveler.scarf.rotation);
+  legs.forEach((leg, i) => leg.rotation.copy(traveler.legs[i].rotation));
+  arms.forEach((arm, i) => arm.rotation.copy(traveler.arms[i].rotation));
+
+  const previous = traveler.body;
+  traveler.group.add(scene);
+  traveler.group.remove(previous);
+  Object.assign(traveler, { body, head, pack, charm, scarf, legs, arms, eyes: undefined, drop: TRAVELER_DROP });
+  // Only the procedural body is retired. The contact shadow and shared texture
+  // maps still belong to the page, as does Three's shared sprite geometry.
+  const materials = new Set();
+  previous.traverse(node => {
+    if (node.isMesh) node.geometry.dispose();
+    if (node.material) materials.add(node.material);
+  });
+  materials.forEach(material => material.dispose());
+}
+
+export function buildTraveler() {
+  const traveler = buildProceduralTraveler();
+  loadTraveler(traveler).catch(error => console.warn("Using procedural traveler.", error));
+  return traveler;
 }
 
 export function buildFarPlanets(rand) {

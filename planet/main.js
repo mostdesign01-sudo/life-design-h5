@@ -329,7 +329,7 @@ function seatOnBench() {
   const bench = objects.bench.parts[0];
   bench.updateMatrixWorld(true);
   // Hips sit on the plank: the group origin is at the feet, and the legs are shorter than the plank is high.
-  const seat = new THREE.Vector3(0, -0.06 + TRAVELER_DROP, 0.07);
+  const seat = new THREE.Vector3(0, -0.06 + (traveler.drop ?? TRAVELER_DROP), 0.07);
   bench.localToWorld(seat);
   traveler.group.position.copy(seat);
   traveler.group.quaternion.copy(bench.quaternion);
@@ -1338,7 +1338,7 @@ function updatePlayer(dt, time) {
   traveler.head.rotation.z = Math.sin(time * 1.3) * 0.04 * idle;
   traveler.head.rotation.x = -hop * 0.25;
   traveler.head.rotation.y = Math.sin(time * 0.37) * Math.sin(time * 0.23 + 1) * 0.7 * idle * (sheetState ? 0.2 : 1);
-  traveler.pack.position.y = 0.58 - TRAVELER_DROP + Math.abs(Math.cos(player.phase)) * 0.025 * s;
+  traveler.pack.position.y = 0.58 - (traveler.drop ?? TRAVELER_DROP) + Math.abs(Math.cos(player.phase)) * 0.025 * s;
   traveler.pack.rotation.x = -0.08 * s;
   traveler.charm.rotation.z = Math.sin(player.phase) * 0.5 * s + Math.sin(time * 1.7) * 0.08;
   traveler.scarf.rotation.z = 0.12 + Math.sin(player.phase + 0.6) * 0.22 * s + Math.sin(time * 1.9) * 0.05;
