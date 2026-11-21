@@ -23,8 +23,7 @@ export function createWorld(canvas) {
   const touchOnly = (navigator.maxTouchPoints || 0) > 0 && !matchMedia("(hover: hover)").matches;
   const mobile = window.innerWidth < 700 || touchOnly;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
-  let pixelRatio = Math.min(window.devicePixelRatio || 1, mobile ? 1.75 : 2);
-  let resolutionScale = 1;
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, mobile ? 1.75 : 2);
   renderer.setPixelRatio(pixelRatio);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.95;
@@ -485,7 +484,7 @@ export function createWorld(canvas) {
   }
 
   function setSize(w, h) {
-    const pr = pixelRatio * resolutionScale;
+    const pr = pixelRatio;
     renderer.setPixelRatio(pr);
     renderer.setSize(w, h, false);
     post.setSize(w, h, pr);
@@ -500,35 +499,7 @@ export function createWorld(canvas) {
     // Two samples even on the slowest tier: without any multisampling every silhouette turns into
     // a staircase, which reads as a low-resolution picture rather than a cheap effect.
     post.setSamples(level >= 1 ? 4 : 2);
-    // On a desktop screen the pixel ratio *is* the resolution, and trading it away is what makes
-    // the frame look blurry; phones are the only place that trade is worth it.
-    if (mobile) pixelRatio = level >= 2 ? pixelRatio : level >= 1 ? Math.min(pixelRatio, 1.25) : 1;
     grass.setCount(level >= 2 ? 1 : level >= 1 ? 0.7 : 0.45);
-    setSize(window.innerWidth, window.innerHeight);
-  }
-
-  // Remember ratios that still dropped frames so we do not climb back into them.
-  const failedScales = new Set();
-  let frameBudget = 0;
-  function setResolutionScale(scale) {
-    // A desktop frame never renders below native: a soft picture is worse than a dropped effect.
-    // Phones can trade resolution, but never to the point where the picture stops reading.
-    const next = THREE.MathUtils.clamp(scale, mobile ? 0.7 : 1, 1);
-    if (Math.abs(next - resolutionScale) < 0.02) return;
-    resolutionScale = next;
-    setSize(window.innerWidth, window.innerHeight);
-  }
-  function noteFrameTime(ms) {
-    if (qualityLevel < 1 || !mobile) return;
-    frameBudget = frameBudget * 0.85 + ms * 0.15;
-    if (frameBudget > 22) {
-      failedScales.add(Math.round(resolutionScale * 20) / 20);
-      setResolutionScale(resolutionScale * 0.85);
-      frameBudget = 16;
-    } else if (frameBudget < 13) {
-      const up = Math.min(1, resolutionScale * 1.08);
-      if (!failedScales.has(Math.round(up * 20) / 20)) setResolutionScale(up);
-    }
   }
 
   function render(cam, time) {
@@ -564,7 +535,7 @@ export function createWorld(canvas) {
   return {
     renderer, scene, camera, sky, clouds: clouds.group, trees: trees.map(t => t.group), bushes, objects, farPlanets, blockers,
     setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust, celebrate, setDiaryReady, setNearCull,
-    setFocus: post.setFocus, setSeeThrough, noteFrameTime, get resolutionScale() { return resolutionScale; },
+    setFocus: post.setFocus, setSeeThrough, get resolutionScale() { return 1; },
     get quality() { return qualityLevel; }
   };
 }

@@ -1611,35 +1611,42 @@ let started = false;
 
 // Measure the frame rate for a few seconds and step effects down on slower phones.
 // `?quality=0|1|2` in the URL pins a level instead.
-const pinnedQuality = new URLSearchParams(location.search).get("quality");
-const perf = { frames: 0, time: 0, done: pinnedQuality !== null, settle: 0 };
-if (pinnedQuality !== null) world.setQuality(Number(pinnedQuality));
+const requestedQuality = new URLSearchParams(location.search).get("quality");
+const pinnedQuality = ["0", "1", "2"].includes(requestedQuality);
+if (pinnedQuality) world.setQuality(Number(requestedQuality));
 
-// Step effects down on a slow device, but measure past the first seconds (shader compilation
-// stalls the first frames) and step back up when the machine turns out to be fine after all.
-function measure(dt, time) {
-  if (perf.done || time < 1.5) return;
-  perf.frames += 1;
-  perf.time += dt;
-  if (perf.time < 3) return;
-  const fps = perf.frames / perf.time;
-  if (!perf.settled) {
-    perf.settled = true;
-    if (fps < 24) world.setQuality(0);
-    else if (fps < 40) world.setQuality(1);
-    return;
-  }
-  perf.settle = fps > 52 ? perf.settle + 1 : 0;
-  if (perf.settle >= 2 && world.quality < 2) {
-    perf.settle = 0;
-    world.setQuality(2);
-  }
+const perf = { frames: 0, time: 0, fastWindows: 0, ceiling: 2, promoted: false };
+
+function resetWindow() {
   perf.frames = 0;
   perf.time = 0;
 }
 
-// The first 1.5 s are compile and texture upload, not a frame rate.
-const warmup = { done: false, at: 0 };
+// Use sustained frame times to adjust effects. A failed promotion caps this session's tier.
+function measure(dt, time) {
+  if (pinnedQuality || time < 2.5) return;
+  if (document.hidden || dt > 1) {
+    resetWindow();
+    perf.fastWindows = 0;
+    return;
+  }
+  perf.frames++;
+  perf.time += dt;
+  if (perf.time < 3) return;
+  const fps = perf.frames / perf.time;
+  resetWindow();
+  const level = world.quality;
+  perf.fastWindows = fps > 52 ? perf.fastWindows + 1 : 0;
+  if (fps < 40 && level > 0) {
+    if (perf.promoted) perf.ceiling = level - 1;
+    world.setQuality(fps < 24 ? 0 : level - 1);
+    perf.promoted = false;
+  } else if (perf.fastWindows >= 2 && level < perf.ceiling) {
+    world.setQuality(level + 1);
+    perf.promoted = true;
+    perf.fastWindows = 0;
+  }
+}
 
 const focusPoint = new THREE.Vector3();
 
@@ -1671,10 +1678,7 @@ function frame() {
   const rawDt = clock.getDelta();
   const dt = Math.min(rawDt, 0.05);
   const time = clock.elapsedTime;
-  // The opening seconds compile shaders and upload textures: never read those frames as a fps dip.
-  if (!warmup.done && time > 2.5) warmup.done = true;
   measure(rawDt, time);
-  if (pinnedQuality === null) world.noteFrameTime?.(warmup.done ? rawDt * 1000 : 0);
   clockNow = time;
   world.update(dt, time);
   sound.tick(Number(life.answers.dashboard.play ?? 5) / 10);
