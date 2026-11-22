@@ -9,7 +9,7 @@ import {
   buildPlanet, buildAtmosphere, buildGrass, scatter, flowerGeometry, mossyRockGeometry
 } from "./ground.js";
 import {
-  buildTree, buildBush, buildSpring, buildWorkshop, buildLanterns,
+  buildTree, buildBush, buildSpring, buildCottage, buildWorkshop, buildLanterns,
   buildBench, buildVine, buildSignpost, buildTraveler, buildFarPlanets
 } from "./props.js";
 
@@ -134,6 +134,18 @@ export function createWorld(canvas) {
   layout.lanterns.front = Z.clone().applyQuaternion(lanterns.group.quaternion);
 
   const blockers = Object.values(layout).map(item => ({ dir: item.dir, radius: item.radius }));
+
+  const cottage = buildCottage();
+  for (const [latitude, longitude, size, yaw] of [
+    [66, 163, 0.70, -0.24], [76, 182, 0.56, 0.38], [69, 205, 0.66, -0.12]
+  ]) {
+    const dir = dirAt(latitude, longitude);
+    const house = cottage.clone();
+    house.scale.setScalar(size);
+    placeOnPlanet(house, dir, yawToward(dir, POLE) + yaw, -0.035);
+    scene.add(house);
+    blockers.push({ dir, radius: 0.68 * size / R });
+  }
 
   const trees = [];
   const treeSpots = [[58, 20, 1.1], [62, 95, 0.95], [55, 150, 1.2], [64, 225, 1.0], [58, 285, 1.15], [70, 330, 0.9], [100, 60, 1.3], [105, 200, 1.25], [120, 300, 1.2], [140, 120, 1.3], [150, 250, 1.1]];
@@ -300,8 +312,10 @@ export function createWorld(canvas) {
     flowers.mesh.count = Math.round(flowers.max * (0.12 + 0.88 * h));
   }
 
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   function updateWorkshop(v, dt, time) {
     const w = current.work;
+    if (!reducedMotion.matches) v.rotor.rotation.z -= dt * (0.24 + (1 - THREE.MathUtils.clamp(w, 0, 1)) * 0.8);
     v.windowMat.emissive.copy(windowCalm).lerp(windowHot, THREE.MathUtils.clamp((1 - w) * 1.4 - 0.2, 0, 1));
     v.windowMat.emissiveIntensity = 0.9 + Math.sin(time * 9) * 0.3 * (1 - w);
     const rate = 1.5 + (1 - w) * 12;

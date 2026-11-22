@@ -374,10 +374,17 @@ function smokeMaterial() {
   return material;
 }
 
-export function buildWorkshop() {
+function timberBeam(group, wood, x, y, z, width, height, depth, angle = 0) {
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), wood);
+  beam.position.set(x, y, z);
+  beam.rotation.z = angle;
+  group.add(beam);
+}
+
+function cottageShell() {
   const group = new THREE.Group();
-  const plank = textured(woodTexture("#c99059", 3));
-  const walls = new THREE.Mesh(new RoundedBoxGeometry(1.0, 0.7, 0.8, 2, 0.035), plank);
+  const plaster = mat(0xf3dbac);
+  const walls = new THREE.Mesh(new RoundedBoxGeometry(1.0, 0.7, 0.8, 2, 0.035), plaster);
   walls.position.y = 0.35;
   group.add(walls);
 
@@ -398,13 +405,67 @@ export function buildWorkshop() {
   group.add(ridge);
 
   const gable = new THREE.Shape([new THREE.Vector2(-0.5, 0), new THREE.Vector2(0.5, 0), new THREE.Vector2(0, 0.36)]);
-  const gableMat = textured(woodTexture("#b98152", 5), { side: THREE.DoubleSide });
+  const gableMat = mat(0xefcf99, { side: THREE.DoubleSide });
   [-0.4, 0.4].forEach(z => {
     const tri = new THREE.Mesh(new THREE.ShapeGeometry(gable), gableMat);
     tri.position.set(0, 0.7, z);
     group.add(tri);
   });
 
+  const wood = mat(0x65412f);
+  for (const z of [-0.408, 0.408]) {
+    for (const x of [-0.47, 0, 0.47]) {
+      timberBeam(group, wood, x, 0.36, z, 0.041, 0.70, 0.025);
+    }
+    timberBeam(group, wood, 0, 0.68, z, 0.98, 0.044, 0.03);
+    timberBeam(group, wood, 0, 0.85, z, 0.04, 0.33, 0.03);
+  }
+  for (const x of [-0.51, 0.51]) {
+    timberBeam(group, wood, x, 0.35, 0, 0.025, 0.69, 0.04);
+    timberBeam(group, wood, x, 0.66, 0, 0.025, 0.044, 0.8);
+  }
+  return group;
+}
+
+export function buildCottage() {
+  const house = cottageShell();
+  const green = mat(0x536c58);
+  const amber = mat(0xffce75, { emissive: 0xe2a85e, emissiveIntensity: 0.35 });
+  timberBeam(house, green, -0.22, 0.22, 0.42, 0.21, 0.44, 0.035);
+  for (const side of [-1, 1]) {
+    timberBeam(house, amber, 0.23, 0.43, side * 0.419, 0.19, 0.22, 0.03);
+    for (const x of [0.08, 0.38]) {
+      timberBeam(house, green, x, 0.43, side * 0.419, 0.08, 0.23, 0.034);
+    }
+  }
+  return mergeStatic(shadow(house));
+}
+
+function buildSails(wood) {
+  const rotor = new THREE.Group();
+  const linen = mat(0xffe7ac, { side: THREE.DoubleSide });
+  for (let i = 0; i < 4; i++) {
+    const blade = new THREE.Group();
+    blade.rotation.z = i * Math.PI / 2;
+    rotor.add(blade);
+    timberBeam(blade, wood, 0, 0.24, 0, 0.024, 0.49, 0.028);
+    timberBeam(blade, linen, 0.055, 0.33, 0, 0.10, 0.27, 0.012);
+    timberBeam(blade, wood, 0.108, 0.33, 0.012, 0.014, 0.29, 0.02);
+    for (const y of [0.20, 0.29, 0.38, 0.47]) {
+      timberBeam(blade, wood, 0.054, y, 0.014, 0.12, 0.014, 0.018);
+    }
+  }
+  const hub = new THREE.Mesh(new THREE.SphereGeometry(0.062, 12, 8), wood);
+  rotor.add(hub);
+  mergeStatic(shadow(rotor));
+  rotor.userData.keep = true;
+  rotor.position.set(0, 0.94, 0.57);
+  rotor.rotation.z = Math.PI / 5;
+  return rotor;
+}
+
+export function buildWorkshop() {
+  const group = cottageShell();
   const stone = textured(stoneTexture());
   const chimney = new THREE.Mesh(new RoundedBoxGeometry(0.17, 0.55, 0.17, 2, 0.02), stone);
   chimney.position.set(-0.28, 0.98, -0.12);
@@ -414,6 +475,9 @@ export function buildWorkshop() {
   group.add(cap);
 
   const darkWood = mat(0x5a3b28);
+  const rotor = buildSails(darkWood);
+  group.add(rotor);
+  timberBeam(group, darkWood, 0, 0.94, 0.48, 0.08, 0.08, 0.19);
   const trim = mat(0xf1e4cc);
   const door = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.44, 0.04, 2, 0.012), darkWood);
   door.position.set(-0.18, 0.22, 0.41);
@@ -500,6 +564,7 @@ export function buildWorkshop() {
   return {
     group,
     windowMat,
+    rotor,
     smoke: {
       mesh: smokeMesh,
       max,
