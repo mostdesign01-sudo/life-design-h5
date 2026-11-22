@@ -30,7 +30,7 @@ A flat, Monument Valley-style version was tried and rejected: on a sphere covere
 - Text contrast is at least 4.5:1 everywhere, including label subtitles and postcard captions. Check this when lightening anything grey.
 - Scores must change the world in a way you can read from a screenshot, pushed to both extremes:
   - Play: sky golden or overcast, and the sun fades. Above about 7 the whole sky, top to horizon, slides into a pink-orange evening glow (`MOODS.dusk` in `planet/sky.js`). The bench stop frames the traveler seated, looking over the bench toward the sun.
-  - Work: white or charcoal smoke, warm or red windows.
+  - Work: slower sails and white smoke at high scores, quicker sails and denser grey smoke at low scores. The door and window keep a warm light.
   - Health: clear or muddy water, mint or straw ground.
   - Love: N of 10 bulbs lit, gold against dark grey.
 

@@ -283,7 +283,7 @@ export function cloudTexture(seed) {
     for (let i = 0; i < 18; i += 1) {
       const x = w * (0.2 + rand() * 0.6);
       const y = h * (0.35 + rand() * 0.3) - Math.sin((x / w) * Math.PI) * h * 0.12;
-      const r = w * (0.1 + rand() * 0.14);
+      const r = Math.min(w * (0.1 + rand() * 0.14), x - 2, w - x - 2, y - 2, h - y - 2);
       const g = ctx.createRadialGradient(x, y, 0, x, y, r);
       g.addColorStop(0, "rgba(255,255,255,1)");
       g.addColorStop(0.7, "rgba(255,255,255,0.9)");

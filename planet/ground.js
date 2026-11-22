@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {
-  R, Y, POLE, PATH_ANGLE, SUN, shared, NOISE_GLSL, patchMaterial, seeThrough,
+  R, Y, POLE, PATH_ANGLE, SUN, WIND, shared, NOISE_GLSL, patchMaterial, seeThrough,
   surfaceRadius, randomDir, yawToward
 } from "./geo.js";
 
@@ -40,10 +40,11 @@ const GROUND_GLSL = /* glsl */`
     col *= 1.0 + (vnoise(d * 4.0) - 0.5) * 0.045;
 
     float off = abs(acos(clamp(dot(d, vec3(${POLE.x.toFixed(5)}, ${POLE.y.toFixed(5)}, ${POLE.z.toFixed(5)})), -1.0, 1.0)) - ${PATH_ANGLE.toFixed(5)});
-    float edge = 0.026 + (vnoise(d * 14.0) - 0.5) * 0.008;
+    float verge = vnoise(d * 38.0);
+    float edge = 0.025 + (vnoise(d * 14.0) - 0.5) * 0.023 + (verge - 0.5) * 0.018;
     float path = 1.0 - smoothstep(edge, edge + 0.032, off + (n - 0.5) * 0.004);
     vec3 dirt = vec3(0.855, 0.735, 0.560) * (1.0 + (n - 0.5) * 0.04);
-    col = mix(col, dirt, path);
+    col = mix(col, dirt * mix(0.91, 1.04, verge), path);
 
     for (int i = 0; i < 6; i++) {
       float dist = chordTo(d, aprons[i].xyz);
@@ -149,7 +150,7 @@ export function buildAtmosphere() {
 
 const TUFT_H = 0.14;
 // The breeze blows one way across the whole planet; every blade leans with it.
-const WIND = new THREE.Vector3(0.82, 0.1, -0.56).normalize();
+
 
 // A soft velvet tuft rather than spiky needles: fewer, broader blades leaning gently downwind so
 // neighbouring tufts blend into one calm carpet instead of breaking up into pixel-wide stripes.
@@ -206,6 +207,7 @@ function grassMaterial() {
   material.defines.TOON_GROUND = "";
   patchMaterial(material, "grass", shader => {
     shader.uniforms.uTime = shared.uTime;
+    shader.uniforms.uBreeze = shared.uBreeze;
     shader.uniforms.uHealth = shared.uHealth;
     shader.uniforms.uHaze = shared.uHaze;
     shader.uniforms.uBenchHaze = shared.uBenchHaze;
@@ -213,7 +215,7 @@ function grassMaterial() {
     shader.uniforms.uAprons = { value: shared._aprons || [] };
     // Bind the same apron array the planet uses (filled by createWorld).
     shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", `#include <common>\nuniform float uTime;\nvarying float vH;\nvarying float vWave;\nvarying vec3 vPlanetDir;`)
+      .replace("#include <common>", `#include <common>\nuniform float uTime, uBreeze;\nvarying float vH;\nvarying float vWave;\nvarying vec3 vPlanetDir;`)
       .replace("#include <begin_vertex>", `#include <begin_vertex>
         vH = clamp(position.y / ${TUFT_H.toFixed(3)}, 0.0, 1.0);
         vec3 ip = vec3(0.0);
@@ -227,7 +229,7 @@ function grassMaterial() {
         float along = dot(ip, windDir);
         float cross = dot(ip, vec3(0.31, 0.62, 0.72));
         float wave = 0.5 + 0.5 * sin(along * 1.15 - uTime * 1.4 + 1.0 * sin(cross * 0.75 + uTime * 0.25));
-        wave = wave * wave * (3.0 - 2.0 * wave);
+        wave = wave * wave * (3.0 - 2.0 * wave) * uBreeze;
         vWave = wave;
         transformed.z += (0.01 + 0.055 * wave) * vH * vH;
         transformed.y -= 0.018 * wave * vH * vH;`)
@@ -314,7 +316,7 @@ export function buildGrass(rand, blockers, { count, aprons }) {
       d = d.addScaledVector(center, 1.4).normalize();
       if (d.dot(center) < 0.55) continue;
       if (blockers.some(b => d.angleTo(b.dir) < b.radius + 0.04)) continue;
-      if (Math.abs(d.angleTo(POLE) - PATH_ANGLE) < 0.05) continue;
+      if (Math.abs(d.angleTo(POLE) - PATH_ANGLE) < 0.032) continue;
       const s = 0.9 + rand() * 0.25;
       q.setFromUnitVectors(Y, d);
       q2.setFromEuler(e.set((rand() - 0.5) * 0.015, yawToward(d, WIND) + (rand() - 0.5) * 0.55, (rand() - 0.5) * 0.015));

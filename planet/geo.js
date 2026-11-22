@@ -67,6 +67,7 @@ const NORTH = TERMINATOR.clone().sub(POLE.clone().multiplyScalar(TERMINATOR.dot(
 const EAST = new THREE.Vector3().crossVectors(NORTH, POLE).normalize();
 
 // The ring path around the lived-in area, as an angle from POLE.
+export const WIND = new THREE.Vector3(0.82, 0.1, -0.56).normalize();
 export const PATH_ANGLE = THREE.MathUtils.degToRad(33);
 
 export function dirAt(aDeg, bDeg) {
@@ -126,6 +127,7 @@ export function yawToward(dir, target) {
 // of the air at the horizon, and the see-through window kept open around the traveler.
 export const shared = {
   uTime: { value: 0 },
+  uBreeze: { value: 0 },
   uHealth: { value: 0.5 },
   uHaze: { value: new THREE.Color("#f3e3d6") },
   uSunTint: { value: new THREE.Color("#ffe0b5") },

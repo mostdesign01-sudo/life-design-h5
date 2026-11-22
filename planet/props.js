@@ -61,8 +61,8 @@ export function addHalo(parent, position, size, color = 0xffc66b) {
   return halo;
 }
 
-const FOLIAGE_DARK = new THREE.Color("#2e5a45");
-const FOLIAGE_LIGHT = new THREE.Color("#b5d65a");
+const FOLIAGE_DARK = new THREE.Color("#30584e");
+const FOLIAGE_LIGHT = new THREE.Color("#abc575");
 const foliageMat = seeThrough(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.3 }));
 
 function foliageShadow(group) {
@@ -117,14 +117,26 @@ function makeCrown(rand, blobCount, spread, yJitter) {
   const lumps = [];
   for (let i = 0; i < blobCount; i += 1) {
     const a = (i / blobCount) * Math.PI * 2 + rand();
-    const r = 0.28 + rand() * 0.22;
+    const r = 0.24 + rand() * 0.17;
     const ox = i === 0 ? 0 : Math.cos(a) * spread;
     const oy = i === 0 ? 0.32 : (rand() - 0.3) * yJitter;
     const oz = i === 0 ? 0 : Math.sin(a) * spread;
-    const geo = lumpGeometry(r, rand() * 100, { detail: 2, amount: 0.16 + rand() * 0.06, squash: 0.85 + rand() * 0.2 });
+    const geo = lumpGeometry(r, rand() * 100, { detail: 2, amount: 0.16 + rand() * 0.06, squash: 0.62 + rand() * 0.20 });
     const matrix = new THREE.Matrix4().makeTranslation(ox, oy, oz);
     parts.push({ geometry: geo, matrix });
     lumps.push({ x: ox, y: oy, z: oz, r });
+  }
+  // Small overlapping sprays interrupt the contour of the larger boughs.
+  // They share the crown geometry and its shadow-to-sun colour ramp.
+  for (const lobe of lumps) {
+    for (let j = 0; j < 5; j++) {
+      const angle = j * 2.4 + lobe.x * 5;
+      const leaf = lumpGeometry(lobe.r * 0.42, angle, { detail: 0, amount: 0.20, squash: 0.50 });
+      const matrix = new THREE.Matrix4().makeRotationY(angle);
+      matrix.setPosition(lobe.x + Math.cos(angle) * lobe.r * 0.82,
+        lobe.y + lobe.r * (0.16 + 0.10 * j), lobe.z + Math.sin(angle) * lobe.r * 0.82);
+      parts.push({ geometry: leaf, matrix });
+    }
   }
   const merged = paintFoliage(mergeGeometries(parts, false), lumps, FOLIAGE_DARK, FOLIAGE_LIGHT);
   const mesh = new THREE.Mesh(merged, foliageMat);
@@ -168,7 +180,7 @@ export function buildTree(rand, scale = 1) {
     group.add(branch);
   }
 
-  const crown = makeCrown(rand, 5 + Math.floor(rand() * 3), 0.32, 0.3);
+  const crown = makeCrown(rand, 5 + Math.floor(rand() * 3), 0.42, 0.46);
   crown.position.y = 1.05;
   group.add(crown);
   addBlob(group, 0.7, 0.4);
@@ -524,6 +536,27 @@ export function buildWorkshop() {
   lamp.userData.keep = true;
   group.add(lamp);
   addHalo(group, lamp.position, 0.35);
+
+  // Tall hollyhocks frame the door. Leaves and blossoms merge with the static workshop.
+  const stalk = mat(0x587346);
+  const petals = mat(0xd69281);
+  for (const [x, height] of [[-0.45, 0.40], [-0.39, 0.29], [0.45, 0.32]]) {
+    timberBeam(group, stalk, x, height / 2, 0.49, 0.012, height, 0.012);
+    for (let i = 0; i < 4; i++) {
+      const side = i % 2 ? -1 : 1;
+      const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), stalk);
+      leaf.position.set(x + side * 0.027, height * (0.20 + i * 0.15), 0.49);
+      leaf.scale.set(0.045, 0.018, 0.019);
+      leaf.rotation.z = side * 0.48;
+      group.add(leaf);
+      if (i > 0) {
+        const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 4), petals);
+        bloom.scale.z = 0.55;
+        bloom.position.set(x + side * 0.015, height * (0.53 + i * 0.15), 0.505);
+        group.add(bloom);
+      }
+    }
+  }
 
   const bark = mat(0x7a5232);
   const cut = mat(0xe2b884);

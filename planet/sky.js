@@ -91,6 +91,7 @@ const MOODS = {
 export function buildSky(renderer) {
   const uniforms = {
     uTop: { value: MOODS.day.top.clone() },
+    uSkyUp: { value: new THREE.Vector3(0, 1, 0) },
     uMid: { value: MOODS.day.mid.clone() },
     uHorizon: { value: MOODS.day.horizon.clone() },
     uBottom: { value: MOODS.day.bottom.clone() },
@@ -126,13 +127,13 @@ export function buildSky(renderer) {
       }
     `,
     fragmentShader: /* glsl */`
-      uniform vec3 uTop, uMid, uHorizon, uBottom, uSunDir, uSunColor, uGlowColor, uCloudLit, uCloudShade;
+      uniform vec3 uSkyUp, uTop, uMid, uHorizon, uBottom, uSunDir, uSunColor, uGlowColor, uCloudLit, uCloudShade;
       uniform float uSunPower, uSunAmount, uSunSize, uSunSoft, uGlow, uCover, uCloudShift, uVivid;
       uniform sampler2D uCloudMap;
       varying vec3 vDir;
       void main() {
         vec3 d = normalize(vDir);
-        float h = d.y;
+        float h = dot(d, uSkyUp);
         // Shift the gradient far enough down that the thin band of sky the cameras see shows
         // horizon warmth near the limb and real blue above it, instead of the pale bottom haze.
         float hz = h + 0.42;
