@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { createWorld, buildTraveler, surfaceRadius, POLE, SUN, R } from "./world.js";
+import { dirAt } from "./geo.js";
 import { TRAVELER_DROP } from "./props.js";
 import {
   loadLifeState, saveLifeState, loadPlanetState, savePlanetState,
@@ -24,11 +25,11 @@ const SCORE_SCENES = {
     key: "work",
     kicker: "工坊 · 工作",
     title: "星球上有一间小工坊。",
-    story: "炉子要天天清烟道。投入、价值、回报，任何一项长期堵着，烟囱就会冒黑烟，窗户也会烧得发红。",
+    story: "风叶转着，窗边亮着一盏灯。想想最近的工作：每天投入的力气，有多少又回到了你身上？",
     question: "你的工作仪表盘有几分？",
     reactions: [
-      "烟囱在冒黑烟，炉子快过热了。投入、价值或回报里，至少有一项已经堵了很久。",
-      "烟囱时不时冒烟。还在可控范围，但值得每周清一次烟道：是什么在堆积？",
+      "今天风叶转得有点急。灯还亮着。要是能少扛一件事，你想先放下哪一件？",
+      "有些事耗力，也有些事值得。最近哪一刻，让你觉得这份工作还有意思？",
       "烟囱只冒着一缕白烟，窗里是暖光。工作正在给你能量，而不只是拿走它。"
     ]
   },
@@ -162,10 +163,9 @@ const cam = {
 };
 // Intro and overview: an isometric-style view of the whole planet.
 const orbit = {
-  // Face the sun side: the visual sun disc hangs just above the limb, and the intro looks
-  // toward it instead of away (the old yaw put the sun behind the camera, out of frame forever).
-  yaw: Math.atan2(SUN.x, SUN.z) + Math.PI,
-  pitch: 0.5,
+  // Start above the inhabited cap, facing the fronts of the village buildings.
+  yaw: Math.atan2(POLE.x, POLE.z),
+  pitch: Math.asin(POLE.y) - 0.22,
   scale: 1
 };
 
@@ -206,6 +206,7 @@ cam.view = introView();
 
 const input = { x: 0, y: 0, keys: new Set() };
 let autoTarget = null;
+let walkWaypoints = null;
 let sheetState = null;
 let lastNearId = null;
 
@@ -821,6 +822,7 @@ function openObject(id) {
 }
 
 function goTo(id) {
+  walkWaypoints = null;
   if (cam.mode === "intro" || cam.mode === "overview") setFollow();
   const obj = objects[id];
   if (!obj) return;
@@ -1111,6 +1113,13 @@ if (window.visualViewport) {
 els.startBtn.addEventListener("click", () => {
   sound.start();
   setFollow();
+  if (new URLSearchParams(location.search).get("walk") === "workshop") {
+    player.dir.copy(dirAt(31, 265));
+    tangentToward(player.dir, objects.workshop.dir, camForward);
+    player.facing.copy(camForward);
+    goTo("workshop");
+    walkWaypoints = [dirAt(31, 247), dirAt(33, 227), dirAt(33, 206)];
+  }
   // The hint stays until the visitor first moves or taps something.
   els.hint.style.opacity = "1";
 });
@@ -1148,7 +1157,8 @@ function updateCamera(dt, time) {
       away.applyAxisAngle(od, 2.4);
     }
     // The bench is about the sky, so that stop looks up from low down and lets the sky fill the frame.
-    const elevation = obj.id === "bench" ? THREE.MathUtils.degToRad(10) : ELEVATION;
+    const elevation = obj.id === "bench" ? THREE.MathUtils.degToRad(10)
+      : obj.id === "workshop" ? THREE.MathUtils.degToRad(19) : ELEVATION;
     desired.dir.copy(od).multiplyScalar(Math.sin(elevation)).addScaledVector(away, Math.cos(elevation));
     desired.look.copy(objPos).addScaledVector(od, (obj.id === "bench" ? 1.4 : 0.5) * obj.focus);
     desired.up.copy(od);
@@ -1165,8 +1175,12 @@ function updateCamera(dt, time) {
     const punch = (time - react.hop) / 0.6;
     if (punch > 0 && punch < 1) desired.view *= 1 - Math.sin(punch * Math.PI) * 0.08;
   } else {
-    desired.dir.copy(up).multiplyScalar(Math.sin(ELEVATION)).addScaledVector(camForward, -Math.cos(ELEVATION));
-    desired.look.copy(base).addScaledVector(up, 0.5).addScaledVector(camForward, 0.6);
+    const approachingMill = autoTarget === "workshop";
+    const elevation = approachingMill ? THREE.MathUtils.degToRad(15) : ELEVATION;
+    desired.dir.copy(up).multiplyScalar(Math.sin(elevation)).addScaledVector(camForward, -Math.cos(elevation));
+    // Look past the traveler's shoulder so the roof and its sign stay in view.
+    if (approachingMill) desired.dir.applyAxisAngle(up, 0.36);
+    desired.look.copy(base).addScaledVector(up, approachingMill ? 0.77 : 0.5).addScaledVector(camForward, approachingMill ? 1.1 : 0.6);
     desired.up.copy(up);
     desired.view = viewHeightFor(5.0 * cam.zoom, 3.2 * cam.zoom);
   }
@@ -1178,6 +1192,9 @@ function updateCamera(dt, time) {
     desired.up.set(0, 1, 0);
     desired.view = introView() * 1.06;
   }
+  const atMill = (cam.mode === "follow" && autoTarget === "workshop")
+    || (cam.mode === "focus" && cam.focusId === "workshop");
+  world.setVillageHorizon(atMill, dt);
   // A director (used by the promo renderer) may take over the framing; it gets the same smoothing.
   if (cam.director) cam.director(desired, time);
   const baseRate = cam.directorRate ?? (diveT < 1.6 ? 2.6 : cam.mode === "follow" ? 7 : 3);
@@ -1276,15 +1293,18 @@ function updatePlayer(dt, time) {
     }
   } else if (canMove && autoTarget) {
     const obj = objects[autoTarget];
-    tangentToward(player.dir, obj.dir, moveDir);
-    speed = 2.15;
+    const onWalk = autoTarget === "workshop" && walkWaypoints;
+    if (onWalk?.length && player.dir.angleTo(onWalk[0]) < 0.028) onWalk.shift();
+    tangentToward(player.dir, onWalk?.[0] || obj.dir, moveDir);
+    speed = onWalk ? 0.28 : 2.15;
     if (player.dir.angleTo(obj.dir) <= obj.reach) {
       const id = autoTarget;
       autoTarget = null;
       speed = 0;
       openObject(id);
     } else {
-      camForward.lerp(moveDir, 1 - Math.exp(-dt * 1.5));
+      const lookAhead = onWalk ? tangentToward(player.dir, obj.dir) : moveDir;
+      camForward.lerp(lookAhead, 1 - Math.exp(-dt * 1.5));
       reproject(camForward, player.dir);
     }
   } else if (canMove && player.groundTarget) {
@@ -1402,7 +1422,8 @@ function updateLabels() {
   const h = window.innerHeight;
   const nextId = nextQuest()?.id;
   const candidates = labelEls.map(label => {
-    let visible = !sheetState;
+    const onMillWalk = autoTarget === "workshop" && walkWaypoints;
+    let visible = !sheetState && (!onMillWalk || label.id === "workshop");
     if (label.far) {
       const p = farPlanets.find(item => item.id === label.id);
       labelPos.copy(p.group.position).add(new THREE.Vector3(0, p.r + 1.2, 0));

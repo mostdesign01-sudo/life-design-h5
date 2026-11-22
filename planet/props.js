@@ -61,8 +61,8 @@ export function addHalo(parent, position, size, color = 0xffc66b) {
   return halo;
 }
 
-const FOLIAGE_DARK = new THREE.Color("#2e5a45");
-const FOLIAGE_LIGHT = new THREE.Color("#b5d65a");
+const FOLIAGE_DARK = new THREE.Color("#30584e");
+const FOLIAGE_LIGHT = new THREE.Color("#abc575");
 const foliageMat = seeThrough(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.3 }));
 
 function foliageShadow(group) {
@@ -117,14 +117,26 @@ function makeCrown(rand, blobCount, spread, yJitter) {
   const lumps = [];
   for (let i = 0; i < blobCount; i += 1) {
     const a = (i / blobCount) * Math.PI * 2 + rand();
-    const r = 0.28 + rand() * 0.22;
+    const r = 0.24 + rand() * 0.17;
     const ox = i === 0 ? 0 : Math.cos(a) * spread;
     const oy = i === 0 ? 0.32 : (rand() - 0.3) * yJitter;
     const oz = i === 0 ? 0 : Math.sin(a) * spread;
-    const geo = lumpGeometry(r, rand() * 100, { detail: 2, amount: 0.16 + rand() * 0.06, squash: 0.85 + rand() * 0.2 });
+    const geo = lumpGeometry(r, rand() * 100, { detail: 2, amount: 0.16 + rand() * 0.06, squash: 0.62 + rand() * 0.20 });
     const matrix = new THREE.Matrix4().makeTranslation(ox, oy, oz);
     parts.push({ geometry: geo, matrix });
     lumps.push({ x: ox, y: oy, z: oz, r });
+  }
+  // Small overlapping sprays interrupt the contour of the larger boughs.
+  // They share the crown geometry and its shadow-to-sun colour ramp.
+  for (const lobe of lumps) {
+    for (let j = 0; j < 5; j++) {
+      const angle = j * 2.4 + lobe.x * 5;
+      const leaf = lumpGeometry(lobe.r * 0.42, angle, { detail: 0, amount: 0.20, squash: 0.50 });
+      const matrix = new THREE.Matrix4().makeRotationY(angle);
+      matrix.setPosition(lobe.x + Math.cos(angle) * lobe.r * 0.82,
+        lobe.y + lobe.r * (0.16 + 0.10 * j), lobe.z + Math.sin(angle) * lobe.r * 0.82);
+      parts.push({ geometry: leaf, matrix });
+    }
   }
   const merged = paintFoliage(mergeGeometries(parts, false), lumps, FOLIAGE_DARK, FOLIAGE_LIGHT);
   const mesh = new THREE.Mesh(merged, foliageMat);
@@ -168,7 +180,7 @@ export function buildTree(rand, scale = 1) {
     group.add(branch);
   }
 
-  const crown = makeCrown(rand, 5 + Math.floor(rand() * 3), 0.32, 0.3);
+  const crown = makeCrown(rand, 5 + Math.floor(rand() * 3), 0.42, 0.46);
   crown.position.y = 1.05;
   group.add(crown);
   addBlob(group, 0.7, 0.4);
@@ -374,10 +386,17 @@ function smokeMaterial() {
   return material;
 }
 
-export function buildWorkshop() {
+function timberBeam(group, wood, x, y, z, width, height, depth, angle = 0) {
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), wood);
+  beam.position.set(x, y, z);
+  beam.rotation.z = angle;
+  group.add(beam);
+}
+
+function cottageShell() {
   const group = new THREE.Group();
-  const plank = textured(woodTexture("#c99059", 3));
-  const walls = new THREE.Mesh(new RoundedBoxGeometry(1.0, 0.7, 0.8, 2, 0.035), plank);
+  const plaster = mat(0xf3dbac);
+  const walls = new THREE.Mesh(new RoundedBoxGeometry(1.0, 0.7, 0.8, 2, 0.035), plaster);
   walls.position.y = 0.35;
   group.add(walls);
 
@@ -398,13 +417,68 @@ export function buildWorkshop() {
   group.add(ridge);
 
   const gable = new THREE.Shape([new THREE.Vector2(-0.5, 0), new THREE.Vector2(0.5, 0), new THREE.Vector2(0, 0.36)]);
-  const gableMat = textured(woodTexture("#b98152", 5), { side: THREE.DoubleSide });
+  const gableMat = mat(0xefcf99, { side: THREE.DoubleSide });
   [-0.4, 0.4].forEach(z => {
     const tri = new THREE.Mesh(new THREE.ShapeGeometry(gable), gableMat);
     tri.position.set(0, 0.7, z);
     group.add(tri);
   });
 
+  const wood = mat(0x65412f);
+  for (const z of [-0.408, 0.408]) {
+    for (const x of [-0.47, 0, 0.47]) {
+      timberBeam(group, wood, x, 0.36, z, 0.041, 0.70, 0.025);
+    }
+    timberBeam(group, wood, 0, 0.68, z, 0.98, 0.044, 0.03);
+    timberBeam(group, wood, 0, 0.85, z, 0.04, 0.33, 0.03);
+  }
+  for (const x of [-0.51, 0.51]) {
+    timberBeam(group, wood, x, 0.35, 0, 0.025, 0.69, 0.04);
+    timberBeam(group, wood, x, 0.66, 0, 0.025, 0.044, 0.8);
+  }
+  return group;
+}
+
+export function buildCottage() {
+  const house = cottageShell();
+  const green = mat(0x536c58);
+  const amber = mat(0xffce75, { emissive: 0xe2a85e, emissiveIntensity: 0.35 });
+  timberBeam(house, green, -0.22, 0.22, 0.42, 0.21, 0.44, 0.035);
+  for (const side of [-1, 1]) {
+    timberBeam(house, amber, 0.23, 0.43, side * 0.419, 0.19, 0.22, 0.03);
+    for (const x of [0.08, 0.38]) {
+      timberBeam(house, green, x, 0.43, side * 0.419, 0.08, 0.23, 0.034);
+    }
+  }
+  return mergeStatic(shadow(house));
+}
+
+function buildSails(wood) {
+  const rotor = new THREE.Group();
+  const linen = mat(0xffe7ac, { side: THREE.DoubleSide });
+  for (let i = 0; i < 4; i++) {
+    const blade = new THREE.Group();
+    blade.rotation.z = i * Math.PI / 2;
+    rotor.add(blade);
+    timberBeam(blade, wood, 0, 0.24, 0, 0.024, 0.49, 0.028);
+    timberBeam(blade, linen, 0.055, 0.33, 0, 0.10, 0.27, 0.012);
+    timberBeam(blade, wood, 0.108, 0.33, 0.012, 0.014, 0.29, 0.02);
+    for (const y of [0.20, 0.29, 0.38, 0.47]) {
+      timberBeam(blade, wood, 0.054, y, 0.014, 0.12, 0.014, 0.018);
+    }
+  }
+  const hub = new THREE.Mesh(new THREE.SphereGeometry(0.062, 12, 8), wood);
+  rotor.add(hub);
+  mergeStatic(shadow(rotor));
+  rotor.userData.keep = true;
+  rotor.position.set(0, 1.09, 0.57);
+  rotor.scale.setScalar(1.15);
+  rotor.rotation.z = Math.PI / 5;
+  return rotor;
+}
+
+export function buildWorkshop() {
+  const group = cottageShell();
   const stone = textured(stoneTexture());
   const chimney = new THREE.Mesh(new RoundedBoxGeometry(0.17, 0.55, 0.17, 2, 0.02), stone);
   chimney.position.set(-0.28, 0.98, -0.12);
@@ -414,6 +488,9 @@ export function buildWorkshop() {
   group.add(cap);
 
   const darkWood = mat(0x5a3b28);
+  const rotor = buildSails(darkWood);
+  group.add(rotor);
+  timberBeam(group, darkWood, 0, 1.035, 0.48, 0.08, 0.18, 0.19);
   const trim = mat(0xf1e4cc);
   const door = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.44, 0.04, 2, 0.012), darkWood);
   door.position.set(-0.18, 0.22, 0.41);
@@ -460,6 +537,27 @@ export function buildWorkshop() {
   group.add(lamp);
   addHalo(group, lamp.position, 0.35);
 
+  // Tall hollyhocks frame the door. Leaves and blossoms merge with the static workshop.
+  const stalk = mat(0x587346);
+  const petals = mat(0xd69281);
+  for (const [x, height] of [[-0.45, 0.40], [-0.39, 0.29], [0.45, 0.32]]) {
+    timberBeam(group, stalk, x, height / 2, 0.49, 0.012, height, 0.012);
+    for (let i = 0; i < 4; i++) {
+      const side = i % 2 ? -1 : 1;
+      const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), stalk);
+      leaf.position.set(x + side * 0.027, height * (0.20 + i * 0.15), 0.49);
+      leaf.scale.set(0.045, 0.018, 0.019);
+      leaf.rotation.z = side * 0.48;
+      group.add(leaf);
+      if (i > 0) {
+        const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 4), petals);
+        bloom.scale.z = 0.55;
+        bloom.position.set(x + side * 0.015, height * (0.53 + i * 0.15), 0.505);
+        group.add(bloom);
+      }
+    }
+  }
+
   const bark = mat(0x7a5232);
   const cut = mat(0xe2b884);
   for (let i = 0; i < 6; i += 1) {
@@ -500,6 +598,7 @@ export function buildWorkshop() {
   return {
     group,
     windowMat,
+    rotor,
     smoke: {
       mesh: smokeMesh,
       max,

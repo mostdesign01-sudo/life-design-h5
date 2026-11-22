@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { createPost, softTexture } from "./look.js";
 import {
-  R, Y, Z, SUN, POLE, TERMINATOR, PATH_ANGLE, shared, patchMaterial,
+  R, Y, Z, SUN, POLE, TERMINATOR, WIND, PATH_ANGLE, shared, patchMaterial,
   dirAt, surfaceRadius, placeOnPlanet, yawToward, rng, randomDir
 } from "./geo.js";
 import { buildSky, buildCloudSea, buildMotes } from "./sky.js";
@@ -9,7 +9,7 @@ import {
   buildPlanet, buildAtmosphere, buildGrass, scatter, flowerGeometry, mossyRockGeometry
 } from "./ground.js";
 import {
-  buildTree, buildBush, buildSpring, buildWorkshop, buildLanterns,
+  buildTree, buildBush, buildSpring, buildCottage, buildWorkshop, buildLanterns,
   buildBench, buildVine, buildSignpost, buildTraveler, buildFarPlanets
 } from "./props.js";
 
@@ -37,7 +37,7 @@ export function createWorld(canvas) {
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 600);
 
   const rand = rng(612);
-  const { sky, setMood } = buildSky(renderer);
+  const { sky, setMood, uniforms: skyUniforms } = buildSky(renderer);
   scene.add(sky);
 
   // Image-based lighting: bake the sky into a PMREM env map so every standard material
@@ -135,8 +135,20 @@ export function createWorld(canvas) {
 
   const blockers = Object.values(layout).map(item => ({ dir: item.dir, radius: item.radius }));
 
+  const cottage = buildCottage();
+  for (const [latitude, longitude, size, yaw] of [
+    [66, 163, 0.70, -0.24], [76, 182, 0.56, 0.38], [69, 205, 0.66, -0.12]
+  ]) {
+    const dir = dirAt(latitude, longitude);
+    const house = cottage.clone();
+    house.scale.setScalar(size);
+    placeOnPlanet(house, dir, yawToward(dir, POLE) + yaw, -0.035);
+    scene.add(house);
+    blockers.push({ dir, radius: 0.68 * size / R });
+  }
+
   const trees = [];
-  const treeSpots = [[58, 20, 1.1], [62, 95, 0.95], [55, 150, 1.2], [64, 225, 1.0], [58, 285, 1.15], [70, 330, 0.9], [100, 60, 1.3], [105, 200, 1.25], [120, 300, 1.2], [140, 120, 1.3], [150, 250, 1.1]];
+  const treeSpots = [[58, 20, 1.1], [62, 95, 0.95], [55, 150, 1.2], [64, 236, 1.0], [58, 285, 1.15], [70, 330, 0.9], [100, 60, 1.3], [105, 200, 1.25], [120, 300, 1.2], [140, 120, 1.3], [150, 250, 1.1]];
   treeSpots.forEach(([a, b, s]) => {
     const dir = dirAt(a, b);
     if (blockers.some(item => dir.angleTo(item.dir) < item.radius + 0.18)) return;
@@ -144,6 +156,7 @@ export function createWorld(canvas) {
     placeOnPlanet(tree.group, dir, rand() * 6, -0.04);
     scene.add(tree.group);
     popIn(tree.group, 0.15 + trees.length * 0.05);
+    tree.wind = WIND.clone().applyQuaternion(tree.group.quaternion.clone().invert());
     trees.push(tree);
     blockers.push({ dir, radius: (0.22 * s) / R });
   });
@@ -174,6 +187,9 @@ export function createWorld(canvas) {
     if (dir.dot(POLE) < 0 && rand() < 0.75) dir.multiplyScalar(-1);
     return { dir, spread: 0.04 + rand() * 0.055, colour: i % flowerPalette.length };
   });
+  for (const [lat, lon] of [[28, 144], [38, 152], [28, 161], [38, 174], [26, 195]]) {
+    drifts.push({ dir: dirAt(lat, lon), spread: 0.037, colour: drifts.length % 2 });
+  }
   const flowers = scatter(rand, 400, blockers, flowerGeometry(), flowerMat, {
     avoidPath: true, tilt: 0.12, scaleMin: 0.85, scaleMax: 1.2,
     near: r => {
@@ -230,6 +246,14 @@ export function createWorld(canvas) {
   let tiltShift = true;
   let qualityLevel = 2;
   let benchGaze = 0;
+  function setVillageHorizon(active, dt) {
+    // On this side of the sphere, the local horizon tilts well away from world Y.
+    const blend = 1 - Math.exp(-dt * 2);
+    skyUniforms.uSkyUp.value.lerp(active ? layout.workshop.dir : Y, blend).normalize();
+    for (const material of clouds.materials) {
+      material.opacity += ((active ? 0.38 : 1) - material.opacity) * blend;
+    }
+  }
   function setBenchGaze(value) {
     benchGaze = THREE.MathUtils.clamp(value, 0, 1);
   }
@@ -238,8 +262,8 @@ export function createWorld(canvas) {
   const target = { ...current };
   const velocity = { health: 0, work: 0, play: 0, love: 0 };
   const windowCalm = new THREE.Color(0xffb455);
-  const windowHot = new THREE.Color(0xff2a00);
-  const smokeDark = new THREE.Color(0x3b3742);
+  const windowHot = new THREE.Color(0xe99760);
+  const smokeDark = new THREE.Color(0x938994);
   const smokeLight = new THREE.Color(0xfff6f0);
   const fogTint = new THREE.Color(0xf3e3d6);
   const benchWarm = new THREE.Color(0xffd2a8);
@@ -300,11 +324,18 @@ export function createWorld(canvas) {
     flowers.mesh.count = Math.round(flowers.max * (0.12 + 0.88 * h));
   }
 
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const chimneyWind = WIND.clone().applyQuaternion(workshop.group.quaternion.clone().invert());
+  function breezeAt(time) {
+    return reducedMotion.matches ? 0 : THREE.MathUtils.smoothstep(Math.sin(time * 0.66), -0.42, 0.83);
+  }
   function updateWorkshop(v, dt, time) {
     const w = current.work;
+    if (!reducedMotion.matches) v.rotor.rotation.z -= dt * (0.24 + (1 - THREE.MathUtils.clamp(w, 0, 1)) * 0.8);
     v.windowMat.emissive.copy(windowCalm).lerp(windowHot, THREE.MathUtils.clamp((1 - w) * 1.4 - 0.2, 0, 1));
-    v.windowMat.emissiveIntensity = 0.9 + Math.sin(time * 9) * 0.3 * (1 - w);
-    const rate = 1.5 + (1 - w) * 12;
+    v.windowMat.emissiveIntensity = 0.9 + Math.sin(time * 2) * 0.09 * (1 - w);
+    const drift = 0.035 + breezeAt(time - 0.7) * 0.34;
+    const rate = 1.5 + (1 - w) * 6;
     v.spawn += dt * rate;
     const smoke = v.smoke;
     const alphas = smoke.mesh.geometry.getAttribute("aAlpha");
@@ -350,8 +381,8 @@ export function createWorld(canvas) {
       smoke.mesh.getMatrixAt(i, smokeMat4);
       smokeMat4.decompose(smokePos, smokeQuat, smokeScale);
       smokePos.y += dt * (0.35 + (1 - w) * 0.25);
-      smokePos.x += smoke.drifts[i * 2] * dt;
-      smokePos.z += smoke.drifts[i * 2 + 1] * dt;
+      smokePos.x += (smoke.drifts[i * 2] + chimneyWind.x * drift) * dt;
+      smokePos.z += (smoke.drifts[i * 2 + 1] + chimneyWind.z * drift) * dt;
       const size = smoke.sizes[i] * (0.75 + (1.7 + (1 - w) * 1.9) * Math.pow(k, 0.55));
       smokeScale.set(size, size, size);
       // Every puff slowly turns on its own axis so facets never line up across instances.
@@ -371,6 +402,7 @@ export function createWorld(canvas) {
 
   function update(dt, time) {
     shared.uTime.value = time;
+    shared.uBreeze.value = breezeAt(time);
     clockTime = time;
     const k = 1 - Math.exp(-dt * 2.5);
     Object.keys(current).forEach(key => {
@@ -463,9 +495,10 @@ export function createWorld(canvas) {
     sign.halo.visible = diaryReady;
     workshop.windowMat.emissiveIntensity += bumpAt(fx.flash, 0.5) * 1.5;
 
+    const canopyBreeze = breezeAt(time - 0.32);
     trees.forEach(tree => {
-      tree.crown.rotation.z = Math.sin(time * 0.9 + tree.phase) * 0.025;
-      tree.crown.rotation.x = Math.sin(time * 0.7 + tree.phase * 1.3) * 0.02;
+      tree.crown.rotation.z = -tree.wind.x * canopyBreeze * (0.075 + Math.sin(time + tree.phase) * 0.012);
+      tree.crown.rotation.x = tree.wind.z * canopyBreeze * 0.07;
       tree.group.visible = !cull || cullTmp.copy(tree.group.position).sub(cull.look).dot(cull.dir) < 1.2;
     });
     bushes.forEach(bush => {
@@ -545,7 +578,7 @@ export function createWorld(canvas) {
   return {
     renderer, scene, camera, sky, clouds: clouds.group, trees: trees.map(t => t.group), bushes, objects, farPlanets, blockers,
     setTargets, snap, update, render, setSize, setQuality, snapshot, kickDust, celebrate, setDiaryReady, setNearCull,
-    setFocus: post.setFocus, setSeeThrough, setBenchGaze, get benchGaze() { return benchGaze; }, get resolutionScale() { return 1; },
+    setFocus: post.setFocus, setSeeThrough, setVillageHorizon, setBenchGaze, get benchGaze() { return benchGaze; }, get resolutionScale() { return 1; },
     get quality() { return qualityLevel; }
   };
 }

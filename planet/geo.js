@@ -16,14 +16,17 @@ import * as THREE from "three";
     chunk[name] = chunk[name].replace(from, to);
   };
   swap("lights_physical_pars_fragment",
-    "float dotNL = saturate( dot( geometryNormal, directLight.direction ) );",
+    "reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );",
     `float toonNL = dot( geometryNormal, directLight.direction );
 	#ifdef TOON_GROUND
 	// Terrain stays one broad soft ramp: a hard step across a smooth sphere reads as a seam.
-	float dotNL = smoothstep( -0.16, 0.42, toonNL );
+	float diffuseBand = smoothstep( -0.16, 0.42, toonNL );
 	#else
-	float dotNL = 0.60 * smoothstep( -0.08, 0.0, toonNL ) + 0.40 * smoothstep( 0.44, 0.52, toonNL );
-	#endif`);
+	float diffuseBand = 0.60 * smoothstep( -0.08, 0.0, toonNL ) + 0.40 * smoothstep( 0.44, 0.52, toonNL );
+	#endif
+    // Keep the physical cosine for specular. Wrapped diffuse light at grazing angles
+    // otherwise amplifies the GGX term into white flecks.
+    reflectedLight.directDiffuse += diffuseBand * directLight.color * BRDF_Lambert( material.diffuseColor );`);
   swap("lights_fragment_begin",
     "directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;",
     "directLight.color *= ( directLight.visible && receiveShadow ) ? smoothstep( 0.3, 0.7, getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) ) : 1.0;");
@@ -64,6 +67,7 @@ const NORTH = TERMINATOR.clone().sub(POLE.clone().multiplyScalar(TERMINATOR.dot(
 const EAST = new THREE.Vector3().crossVectors(NORTH, POLE).normalize();
 
 // The ring path around the lived-in area, as an angle from POLE.
+export const WIND = new THREE.Vector3(0.82, 0.1, -0.56).normalize();
 export const PATH_ANGLE = THREE.MathUtils.degToRad(33);
 
 export function dirAt(aDeg, bDeg) {
@@ -123,6 +127,7 @@ export function yawToward(dir, target) {
 // of the air at the horizon, and the see-through window kept open around the traveler.
 export const shared = {
   uTime: { value: 0 },
+  uBreeze: { value: 0 },
   uHealth: { value: 0.5 },
   uHaze: { value: new THREE.Color("#f3e3d6") },
   uSunTint: { value: new THREE.Color("#ffe0b5") },
