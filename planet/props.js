@@ -459,7 +459,8 @@ function buildSails(wood) {
   rotor.add(hub);
   mergeStatic(shadow(rotor));
   rotor.userData.keep = true;
-  rotor.position.set(0, 0.94, 0.57);
+  rotor.position.set(0, 1.09, 0.57);
+  rotor.scale.setScalar(1.15);
   rotor.rotation.z = Math.PI / 5;
   return rotor;
 }
@@ -477,7 +478,7 @@ export function buildWorkshop() {
   const darkWood = mat(0x5a3b28);
   const rotor = buildSails(darkWood);
   group.add(rotor);
-  timberBeam(group, darkWood, 0, 0.94, 0.48, 0.08, 0.08, 0.19);
+  timberBeam(group, darkWood, 0, 1.035, 0.48, 0.08, 0.18, 0.19);
   const trim = mat(0xf1e4cc);
   const door = new THREE.Mesh(new RoundedBoxGeometry(0.24, 0.44, 0.04, 2, 0.012), darkWood);
   door.position.set(-0.18, 0.22, 0.41);
